@@ -1,0 +1,38 @@
+# Secrets: never commit. Only the template is tracked.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Test and tool caches
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+
+# Logs and local database dumps
+*.log
+*.dump
+*.sql.gz
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS files
+Thumbs.db
+desktop.ini
+.DS_Store

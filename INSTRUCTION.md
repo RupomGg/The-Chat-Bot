@@ -1,0 +1,262 @@
+# INSTRUCTION.md: How we build this project, portion by portion
+
+This file is the build plan and the rulebook. `PRD.md` says **what** to build; this file says **in what order** and **when a portion counts as finished**. `DECISION.md` records **every** file created or changed and why.
+
+Audience: you (product owner) and Claude (engineer). Start every Claude Code session with:
+
+> Read `INSTRUCTION.md`, `DECISION.md` and the PRD sections listed for portion **P?.?**. Build only that portion, following the rules in INSTRUCTION.md. Stop at the gate.
+
+---
+
+## 1. The rules
+
+### 1.1 One portion at a time
+- A portion is small: typically 1–4 source files plus their tests. Each is listed in §4 with its files, PRD references and required corner cases.
+- **Never start the next portion until the current one passes its gate (§2) and you have signed off.**
+- Never "quickly" add something from a later portion. If a later need shows up, note it in DECISION.md under *Open items*.
+
+### 1.2 Tests first, then code
+For every portion:
+1. Read the PRD sections listed for the portion.
+2. Write the **corner-case list** from §4 into the test file as test names *before* writing implementation code. Add any extra corner cases found while reading.
+3. Implement until all tests pass.
+4. Run the **whole** suite, not just the new tests, so a new portion can't silently break an old one.
+5. Run the gate (§2).
+6. Log everything in DECISION.md (§3).
+7. Show the gate output to the owner. Wait for sign-off.
+
+### 1.3 Handling bugs
+- A bug found at any time gets: (1) a failing test that reproduces it, (2) the fix, (3) the test passing, (4) a DECISION.md entry of type `fix` naming the root cause.
+- **Fix the root cause in the shared function**, not a patch at one call site. Check every caller.
+- A bug in an already-signed-off portion re-opens that portion: its gate must pass again.
+- **Never** delete, skip (`@pytest.mark.skip`) or weaken a test to make the suite pass. If a test is wrong, say so, fix it, and log the reason.
+
+### 1.4 What "sure there's no underlying bug" means
+Coverage alone doesn't prove correctness. A 100%-covered function can still be wrong. So a portion is only done when **all** of these hold:
+- Every corner case in its §4 list has a test, and each test asserts a *specific* outcome (not just "doesn't crash").
+- Failure paths are tested as seriously as happy paths: bad input, missing data, network errors, duplicates, concurrency, time boundaries.
+- The code has been re-read once, top to bottom, asking "what input breaks this?". Anything found becomes a test.
+- The owner has seen the gate output.
+
+---
+
+## 2. The gate ("100/100")
+
+A portion passes only when **every** line below is true. Claude pastes the real command output into the session. A summary like "all good" doesn't count.
+
+| # | Check | Command | Pass condition |
+|---|---|---|---|
+| G1 | All tests pass | `python -m pytest -q` | 0 failed, 0 errors, 0 skipped, 0 xfail |
+| G2 | Full coverage on the portion's code | `python -m coverage run -m pytest -q` then `python -m coverage report --fail-under=100 --include="<portion files>"` | 100% lines **and** branches (`branch = true` in config) |
+| G3 | Whole-project coverage doesn't drop | `python -m coverage report --fail-under=100` | 100% across `app/` (from portion P0.1 on) |
+| G4 | Lint + format | `python -m ruff check .` and `python -m ruff format --check .` | No findings |
+| G5 | No warnings | `pyproject.toml` has `filterwarnings = ["error", ...]`, so every G1 run already fails on any warning. Check: the config still starts with `"error"`, and every `ignore:` line targets one exact third-party message with a comment + DECISION.md open item | No broad ignores; don't pass `-W error` on the command line (it overrides the narrow ignores) |
+| G6 | Tests are order-independent | Normal run (G1), then reverse file order: `python -m pytest -q $(ls tests/test_*.py \| sort -r)` | Both pass |
+| G7 | Tests are stable | Run G1 three times in a row | Same result every time (no flaky tests) |
+| G8 | Manual check | The portion's "Manual check" line in §4 | Owner sees it work |
+| G9 | Logged | DECISION.md entry for this portion | Lists every new/changed file, why, and the gate result |
+
+`# pragma: no cover` is allowed only for code that truly can't run in tests (e.g. `if __name__ == "__main__":`), and each use must be listed in the DECISION.md entry with a reason.
+
+---
+
+## 3. How to log in DECISION.md
+
+Every portion adds one entry (format in DECISION.md). Every file touched is listed:
+- **New file:** path + one line on its job.
+- **Changed file:** path + what changed + why + which other files depend on it (so nothing breaks unnoticed).
+- **Deleted file:** path + why + what replaces it.
+
+Decisions (choices between options) get their own `D-###` id and are referenced from portion entries.
+
+---
+
+## 4. The portions
+
+Levels group portions. Finish a level before starting the next one. Every portion lists: **Goal · Files · PRD refs · Corner cases (must each be a test) · Manual check.**
+
+### Level 0: Foundation
+
+**P0.1 Project skeleton and tooling**
+- Goal: an empty but correctly configured Python project that starts and answers `/healthz`.
+- Files: `pyproject.toml` (deps pinned, ruff + coverage + pytest config), `app/__init__.py`, `app/config.py`, `app/main.py`, `tests/conftest.py`, `tests/test_config.py`, `tests/test_health.py`, `.gitignore`, `.env.example`, `README.md`.
+- PRD refs: §8.1, §8.2, §12.2, Appendix E.
+- Corner cases:
+  - each required env var missing → startup fails with a message naming the variable (without printing any secret value);
+  - `ENV` not in {`staging`, `production`, `test`} → fails;
+  - `FERNET_KEY` not a valid Fernet key → fails at startup, not at first use;
+  - `DATABASE_URL` malformed → fails with a clear message;
+  - `PUBLIC_BASE_URL` without `https://` in production → fails;
+  - config object is immutable after load;
+  - `/healthz` returns 200 with `{"status":"ok"}` when healthy and never includes secrets;
+  - `repr()`/logging of config masks secret fields.
+- Manual check: `uvicorn app.main:app` runs; browser shows `/healthz` OK.
+
+**P0.2 Continuous integration**
+- Goal: every push runs the full gate automatically.
+- Files: `.github/workflows/ci.yml`.
+- PRD refs: §8.1 (CI/CD), §12.2.
+- Corner cases: CI uses the same Python version as local; a Postgres service is available to tests; a failing test fails the job; a coverage drop fails the job; secrets are not required for the test job.
+- Manual check: push a branch with a deliberately failing test → CI red; revert → green.
+
+### Level 1: Data layer
+
+**P1.1 Database connection and migration runner**
+- Goal: numbered SQL migrations applied safely at startup.
+- Files: `app/db.py`, `migrations/000_schema_version.sql`, `tests/test_db.py`.
+- PRD refs: §8.1 (DB access, migrations), §12.1.
+- Corner cases:
+  - fresh DB → all migrations applied in numeric order;
+  - re-run → nothing re-applied (idempotent);
+  - a migration with an SQL error → that migration rolled back completely, earlier ones kept, startup fails loudly;
+  - an already-applied migration file edited afterwards → checksum mismatch → startup refuses;
+  - two app instances starting at once → migrations applied exactly once (advisory lock);
+  - gap or duplicate in migration numbers → refused;
+  - DB unreachable → clear error with retry/backoff, bounded total wait;
+  - pool exhausted → request waits up to a timeout then fails cleanly.
+- Manual check: start the app twice in parallel against an empty DB; `schema_version` shows each migration once.
+
+**P1.2 Core schema**
+- Goal: all tables from PRD §10 with constraints that make invalid data impossible.
+- Files: `migrations/001_init.sql`, `tests/test_schema.py`.
+- PRD refs: §10.
+- Corner cases:
+  - every `CHECK` rejects out-of-range values (conversation state, message role, channel type, booking status);
+  - every `UNIQUE` rejects duplicates (`channels(type, external_id)`, `contacts(channel_id, external_user_id)`, `messages(conversation_id, external_id)`, `users.email` case-insensitively);
+  - foreign keys reject orphans; deleting a tenant with data is refused (no silent cascade);
+  - `messages.external_id` NULL allowed many times but non-NULL unique per conversation;
+  - timestamps are `timestamptz` and default to now;
+  - money/cost uses `numeric`, never float.
+- Manual check: `\d+` of each table matches PRD §10.
+
+**P1.3 Security helpers**
+- Goal: encryption, password hashing, signatures, CSRF, all in one small module.
+- Files: `app/security.py`, `tests/test_security.py`.
+- PRD refs: §12.2.
+- Corner cases:
+  - Fernet round-trip; wrong key → specific error; tampered ciphertext → error; empty string round-trips;
+  - scrypt: correct password verifies; wrong one fails; comparison is constant-time (`hmac.compare_digest`); two hashes of the same password differ (salt); unicode/Bangla passwords work; password < 12 chars rejected;
+  - Meta signature: valid → true; missing header, wrong `sha256=` prefix, wrong length, non-hex, body changed by 1 byte, wrong app secret → false (never an exception to the caller);
+  - Telegram secret header: exact match only, constant-time;
+  - CSRF token: valid for its session only; expired/other-session/missing → rejected.
+- Manual check: none beyond the gate (pure functions).
+
+### Level 2: Core domain logic (pure code, no network)
+
+**P2.1 Phone normalization**
+- Files: `app/phones.py`, `tests/test_phones.py`. PRD refs: §5.2, §19.1.
+- Corner cases: `01712345678`, `+8801712345678`, `8801712345678`, `008801712345678` → same E.164; spaces, dashes, dots and brackets stripped; **Bangla digits** `০১৭১২৩৪৫৬৭৮` converted; BD prefix `01[3-9]` enforced (`012…` rejected); wrong length rejected; landline-looking numbers rejected for BD; non-BD tenant (e.g. `+977` Nepal) validates by country length rules only; empty/None/emoji/letters rejected; a number embedded in a sentence is **not** extracted by this function (the model passes the number only); property tests (hypothesis): any accepted number re-normalizes to itself, and random unicode never raises (only returns "invalid").
+- Manual check: none.
+
+**P2.2 Knowledge file and quick answers**
+- Files: `app/knowledge.py`, `tests/test_knowledge.py`, `tests/fixtures/knowledge_demo.md`. PRD refs: §6.8, §9.3, Appendix B.
+- Corner cases: parse all quick-answer blocks; trigger normalization (case, surrounding spaces, repeated spaces, punctuation, emoji, trailing `?`/`।`) with Bangla text preserved; the **same trigger in two blocks → publish error** naming both; property test (hypothesis): normalization is idempotent and never raises for any unicode string; block with no answer in the student's language → falls back to the other language, and with no answer at all → publish error; unknown field in a block → error (catches typos); `action: start_booking` blocks have no answer text; empty Quick answers section is allowed; token count reported; the rendered system block is byte-identical across two renders; missing template variable → error, never an empty `{{x}}` left in text.
+- Manual check: parse the demo knowledge file and print the lookup table.
+
+**P2.3 Lead scoring**
+- Files: `app/scoring.py`, `tests/test_scoring.py`. PRD refs: §5.3.
+- Corner cases: each rule on its own; **boundaries** (intake exactly 9 months, 9 months + 1 day, exactly 18 months); intake in the past; intake missing; MOI counts as English; "test booked" counts; funding scholarship-only blocks Hot; country not served blocks Hot; no phone → never above Cold; each flag (refusal, gap ≥ 5 exactly and 4, scholarship-only); "today" injected (never read the real clock inside the function); month arithmetic across year end (Nov → Aug next year).
+- Manual check: none.
+
+**P2.4 Counselling slots and bookings**
+- Files: `app/booking.py`, `tests/test_booking.py`. PRD refs: §6.2 (F14–F15).
+- Corner cases: weekly schedule → slots; slot ending exactly at closing time included, one crossing it excluded; holidays excluded; past slots excluded (now = injected); capacity respected; **two bookings racing for the last seat → exactly one succeeds** (DB transaction + row lock); cancelled booking frees capacity; overlapping schedule rows don't duplicate slots; a timezone with daylight saving (e.g. `Europe/London`) on the change date (for international tenants); Asia/Dhaka (no DST); Friday closed; empty schedule → "no slots" (not an error); request for 5 slots when only 2 exist returns 2.
+- Manual check: print next week's slots for the demo tenant.
+
+**P2.5 Sensitive-data redaction**
+- Files: `app/redact.py`, `tests/test_redact.py`. PRD refs: §9.5.
+- Corner cases: valid card numbers (Luhn-checked; with spaces/dashes) redacted; 16-digit non-Luhn strings not redacted; NID lengths 10/13/17 redacted; **11-digit BD phone numbers NOT redacted**; money amounts ("15,00,000 taka", "1500000") not redacted; passport-like `[A-Z]{1,2}\d{7}` redacted; Bangla digits handled; text with several items redacts all; redaction is idempotent (running twice gives the same text); property tests (hypothesis): random text never raises, and valid BD phone numbers inserted anywhere in random text always survive unredacted.
+- Manual check: none.
+
+### Level 3: Background jobs
+
+**P3.1 Job queue and worker**
+- Files: `app/jobs.py`, `app/worker.py`, `tests/test_jobs.py`. PRD refs: §8, §12.1.
+- Corner cases: enqueue + process once; `run_at` in the future not picked early; failure → retry with exponential backoff; max attempts → `dead` + alert hook called; **two workers never process the same job** (SKIP LOCKED, tested with two concurrent claimers); worker killed mid-job → lock expires → job picked up again (stale-lock recovery); handler must be idempotent → duplicate delivery doesn't double side effects (tested with a counter); unknown job kind → dead immediately with a clear error; payload not JSON-serializable → rejected at enqueue; graceful shutdown finishes the current job; queue depth + oldest-job age exposed for `/healthz`.
+- Manual check: run the worker, enqueue a job that fails twice then succeeds; watch the retries in logs.
+
+### Level 4: AI engine
+
+**P4.1 Prompt assembly**
+- Files: `app/prompts.py`, `prompts/system.md`, `tests/test_prompts.py`. PRD refs: §9.2, Appendix A.
+- Corner cases: system block byte-identical for the same tenant and knowledge version; changes when knowledge changes; context block contains time in the tenant's timezone, channel, profile JSON with sorted keys; history limited to the last 30 messages; conversation split after 72 h idle; `staff` messages rendered so the model knows a human spoke; quick-answer messages included; empty history works; a very long student message is capped at 2,000 chars *before* the prompt.
+- Manual check: print the assembled request for the demo tenant.
+
+**P4.2 LLM call (Claude)**
+- Files: `app/llm.py`, `tests/test_llm.py`. PRD refs: §9.1, §9.2.
+- Corner cases (with a fake client, no network): stop reason `end_turn`, `tool_use`, `max_tokens` (→ fallback + event), `refusal` (→ fallback + handoff); API errors 400/401/404 (→ fallback + operator alert, no retry), 429/500/529/timeout/connection error (SDK retries, then fallback); response with no text block; cost computed from usage including cache-read and cache-write tokens with the right per-model prices; unknown model id → error at config time, not at call time; model id prefix `gemini-` routes to the Gemini function (stub raises "not implemented" until P7.1).
+- One **real** smoke test, marked `@pytest.mark.live`, run on demand with a real key (not in CI): a two-turn chat shows `cache_read_input_tokens > 0` on turn 2.
+- Manual check: run the live smoke test once; record tokens and cost in DECISION.md.
+
+**P4.3 Tools**
+- Files: `app/tools.py`, `tests/test_tools.py`. PRD refs: §9.4, §5.2.
+- Corner cases: every tool schema is strict (`additionalProperties: false`); server-side validation re-runs even though the API validates; invalid phone → tool result tells the model what's wrong (no exception); `update_profile` with an empty object → no-op; unknown field → rejected; under-18 → phone and results not stored; `book_counselling` on a full slot → "slot taken" result with alternatives; `book_counselling` on a past slot → rejected; `request_handoff` twice → one handoff; unknown tool name → error result; tool input that isn't valid JSON → error result; tools can only touch the current contact (tested by passing another contact's id → ignored).
+- Manual check: none.
+
+**P4.4 Conversation engine**
+- Files: `app/engine.py`, `tests/test_engine.py`. PRD refs: §5, §6.1–6.3, §6.8.
+- Corner cases: quick-answer payload → fixed answer, **no model call** (asserted on the fake client); exact trigger match → same; tool loop capped (max 5 tool rounds, then fallback); conversation paused (`state='human'`) → bot stays silent, message stored; pause expired → bot replies again; monthly quota reached → overage allowed, hard cap → fixed message + alert; duplicate inbound external id → processed once; two messages from one student arriving together → processed in order (per-conversation lock); unanswered streak 2 → auto-handoff; hot lead → notify hook called once (not on every later message); model failure → fallback + handoff, student gets a reply; message > 2,000 chars truncated with a note; non-text inbound (image/voice/sticker) → polite text reply, no model call.
+- Manual check: through the CLI (P4.5), run 5 scripted conversations and read them.
+
+**P4.5 Demo tenant and CLI chat**
+- Files: `app/chat.py`, `scripts/seed_demo.py`, `tenants/demo/knowledge.md`, `tests/test_seed.py`. PRD refs: Appendix B, §16.1.
+- Corner cases: seed is idempotent (running twice doesn't duplicate); CLI handles Ctrl+C cleanly; CLI works without a real key when `--fake` is passed.
+- Manual check: `python -m app.chat demo` answers in Bangla, Banglish and English.
+
+### Level 5: Channels (each adapter only converts inbound → engine → outbound)
+
+**P5.1 Web chat API** (`app/channels/web.py`): origin allow-list incl. `null` origin and subdomains; rate limit per visitor + per IP; SSE stream closed by the client mid-reply → no crash, reply still stored; poll endpoint; malformed JSON → 400.
+**P5.2 Widget** (`app/static/widget.js`, `demo.html`): ≤ 15 KB gz (measured); localStorage throws → in-memory fallback; network drop → retry with backoff and a visible "reconnecting"; host page CSS can't change it (Shadow DOM); keyboard and screen-reader basics; mobile width 360 px.
+**P5.3 Messenger** (`app/channels/messenger.py`): verify challenge; HMAC with per-app secret; batched entries (several messages in one webhook); echo from our own app ignored, echo from another app → pause; `referral` stored; postback payloads → quick answers; outside the 24 h window → no send; Graph API errors (expired token, user blocked the Page) → event + alert, no retry storm.
+**P5.4 WhatsApp** (`app/channels/whatsapp.py`): status callbacks (sent/delivered/read/failed) ignored for replies but logged; interactive button/list replies → quick answers; template sends only outside the window; coexistence echoes → pause; media messages → text reply; phone_number_id routing.
+**P5.5 Telegram** (`app/channels/telegram.py`): secret header; edited messages ignored; group chats ignored (private only); callback queries → quick answers; bot blocked by user → event, no retries.
+- Manual check for each channel: a real message from a phone gets a correct reply.
+
+### Level 6: Staff apps
+
+**P6.1 Auth and roles**: login rate limit; session fixation prevented (new session id on login); logout invalidates; CSRF on every POST; role checks; **cross-tenant access → 404 on every route** (one test per route, generated from the route table).
+**P6.2 Inbox**: takeover/resume/assign/notes; window timer; reply outside the window blocked; CSV export escapes formulas (`=`, `+`, `-`, `@` at cell start) to prevent CSV injection.
+**P6.3 Operator console**: knowledge publish blocked when evals fail; version rollback; usage/cost numbers match the `messages` table exactly.
+**P6.4 Notifications**: Telegram notify bot; email; failure of one channel doesn't block the other; no duplicate notifications on job retry.
+
+### Level 7: Quality and operations
+
+**P7.1 Evals + Gemini + bake-off**: eval runner; ≥ 60 cases incl. ≥ 20 Banglish; Gemini function (from official `google-genai` docs); bake-off table in `research/model_bakeoff.md`.
+**P7.2 Production readiness**: Dockerfile, `railway.toml`, load test (20 msg/s, 5 min), restore drill, alerts firing test, runbooks, Dedicated deploy + release script.
+
+### Level 8: Pilot features
+**P8.1** reports page · **P8.2** CRM webhook (HMAC-signed, retries) · **P8.3** ad-attribution report.
+
+---
+
+## 5. Prerequisites by level
+
+| Needed | From | Status |
+|---|---|---|
+| Python 3.13 (D-002) | P0.1 | Installed (3.13.1) |
+| PostgreSQL 16 for tests (D-003) | P1.1 | **Not installed yet**: owner installs (§5.1) |
+| Git repo + GitHub account | P0.2 | Git installed; repo not created yet |
+| Anthropic API key with spend cap | P4.2 live test | Not set |
+| Test Facebook Page + Meta app | P5.3 | Not created |
+| WhatsApp test number (SIM) | P5.4 | Not bought |
+| Telegram bot token | P5.5 | Not created |
+| Gemini API key | P7.1 | Not set |
+
+### 5.1 Installing PostgreSQL 16 on Windows (owner, before P1.1)
+1. Download the PostgreSQL 16 Windows installer from the official site (postgresql.org → Download → Windows → EDB installer), or run `winget install PostgreSQL.PostgreSQL.16` in an administrator terminal.
+2. During setup: keep port **5432**; set a password for the `postgres` user and save it in your password manager; Stack Builder isn't needed.
+3. Add `C:\Program Files\PostgreSQL\16\bin` to PATH if the installer didn't, then open a new terminal and check: `psql --version` shows 16.x.
+4. Create a test login (in `psql -U postgres`): `CREATE ROLE chatbot_test LOGIN CREATEDB PASSWORD '<choose one>';`
+5. Put `TEST_DATABASE_URL=postgresql://chatbot_test:<password>@localhost:5432/postgres` in your local `.env` (never committed). Tests create and drop their own database with that role.
+
+---
+
+## 6. Commands (once P0.1 exists)
+
+```bash
+python -m pip install -e ".[dev]"
+python -m pytest -q
+python -m coverage run -m pytest -q && python -m coverage report --fail-under=100
+python -m ruff check . && python -m ruff format --check .
+uvicorn app.main:app --reload
+```
