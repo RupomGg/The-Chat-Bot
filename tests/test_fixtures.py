@@ -85,7 +85,7 @@ def test_clone_retries_while_template_is_in_use(monkeypatch, _migrated_template)
 def test_migrated_copy_has_every_migration(migrated_db_url):
     with psycopg.connect(migrated_db_url) as conn:
         names = [r[0] for r in conn.execute("SELECT name FROM schema_version ORDER BY version")]
-    assert names == ["000_schema_version.sql", "001_init.sql"]
+    assert names == ["000_schema_version.sql", "001_init.sql", "002_universal_core.sql"]
 
 
 def test_changes_to_a_copy_do_not_reach_the_template(migrated_db_url, _migrated_template):

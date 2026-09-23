@@ -71,7 +71,11 @@ def test_new_migration_added_later_is_applied_alone(db_url, mig_dir):
 
 
 def test_real_migrations_directory_applies(db_url):
-    assert migrate(db_url) == ["000_schema_version.sql", "001_init.sql"]
+    assert migrate(db_url) == [
+        "000_schema_version.sql",
+        "001_init.sql",
+        "002_universal_core.sql",
+    ]
     cols = rows(
         db_url,
         "SELECT column_name, data_type FROM information_schema.columns "

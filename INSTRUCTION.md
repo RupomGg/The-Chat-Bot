@@ -60,6 +60,10 @@ A portion passes only when **every** line below is true. Claude pastes the real 
 
 **Deliberate-bug checks (mutation checks) must be crash-safe.** Before breaking a file on purpose, copy it to a backup **outside the project**; restore from that backup in a `finally`; finish by confirming the file is byte-identical to the backup (SHA-256). At the start of any session after an interrupted check, verify the file against the backup before anything else (lesson from P1.2: an interrupted run left `001_init.sql` missing a rule until caught).
 
+**Capture errors and exit codes, not just output.** Every gate command redirects both output streams to its log (`> log 2>&1`) and reports its **exit code**. A blank summary line is a failure until proven otherwise (lesson from C-014: after a crash, ruff panicked on a corrupted cache and printed nothing to stdout, which looked like "clean").
+
+**After a crash or power loss:** before anything else, (1) scan project files for zero-filled or blank files, (2) verify files against the last saved SHA-256 fingerprints and mutation backups, (3) delete tool caches (`.ruff_cache`, `__pycache__`, `.pytest_cache`, `.hypothesis`, `.coverage`); they're rebuilt automatically, (4) confirm PostgreSQL is running and no test databases are left, (5) rerun the full gate.
+
 **A single unexplained failure blocks the gate.** Rerunning until it's green is not a fix. Find the root cause (server logs, leftover state), fix it, add a test, log it.
 
 `# pragma: no cover` is allowed only for code that truly can't run in tests (e.g. `if __name__ == "__main__":`), and each use must be listed in the DECISION.md entry with a reason.
@@ -149,6 +153,16 @@ Levels group portions. Finish a level before starting the next one. Every portio
 
 ### Level 2: Core domain logic (pure code, no network)
 
+Everything industry-specific comes from the tenant's **industry pack** (PRD §0, D-012). Portions in Levels 2–7 must never hard-code study-abroad rules in the core; they read them from the pack. The study_abroad pack is the only one built for now.
+
+**P2.0 Industry pack loader**
+- Goal: load and validate a pack folder so a broken pack can never reach a tenant.
+- Files: `app/packs.py`, `packs/study_abroad/pack.toml` (profile fields, scoring rules, stage labels, handoff rules), `packs/study_abroad/prompt.md`, `packs/study_abroad/knowledge_template.md`, `tests/test_packs.py`, `tests/fixtures/packs/` (small valid and broken packs). Uses stdlib `tomllib`, no new dependency.
+- PRD refs: §0, §5.2, §5.3, Appendix A–C.
+- Corner cases: valid pack loads; missing folder or file → clear error naming it; unknown key (typo) → error; profile field with unknown type → error; scoring rule referring to a field that doesn't exist → error; stage labels must cover exactly the 7 generic stages; prompt template placeholders all known (no stray `{{x}}`); pack name must match the folder and the `tenants.industry` format; loading the same pack twice returns equal results; Bangla text in labels loads correctly; a second tiny fixture pack (e.g. `pet_care_sample`) loads to prove nothing is study-abroad-only.
+- Manual check: print the loaded study_abroad pack summary.
+
+
 **P2.1 Phone normalization**
 - Files: `app/phones.py`, `tests/test_phones.py`. PRD refs: §5.2, §19.1.
 - Corner cases: `01712345678`, `+8801712345678`, `8801712345678`, `008801712345678` → same E.164; spaces, dashes, dots and brackets stripped; **Bangla digits** `০১৭১২৩৪৫৬৭৮` converted; BD prefix `01[3-9]` enforced (`012…` rejected); wrong length rejected; landline-looking numbers rejected for BD; non-BD tenant (e.g. `+977` Nepal) validates by country length rules only; empty/None/emoji/letters rejected; a number embedded in a sentence is **not** extracted by this function (the model passes the number only); property tests (hypothesis): any accepted number re-normalizes to itself, and random unicode never raises (only returns "invalid").
@@ -159,7 +173,7 @@ Levels group portions. Finish a level before starting the next one. Every portio
 - Corner cases: parse all quick-answer blocks; trigger normalization (case, surrounding spaces, repeated spaces, punctuation, emoji, trailing `?`/`।`) with Bangla text preserved; the **same trigger in two blocks → publish error** naming both; property test (hypothesis): normalization is idempotent and never raises for any unicode string; block with no answer in the student's language → falls back to the other language, and with no answer at all → publish error; unknown field in a block → error (catches typos); `action: start_booking` blocks have no answer text; empty Quick answers section is allowed; token count reported; the rendered system block is byte-identical across two renders; missing template variable → error, never an empty `{{x}}` left in text.
 - Manual check: parse the demo knowledge file and print the lookup table.
 
-**P2.3 Lead scoring**
+**P2.3 Lead scoring** (engine in core; the rules below are the study_abroad pack's, read from `pack.toml`)
 - Files: `app/scoring.py`, `tests/test_scoring.py`. PRD refs: §5.3.
 - Corner cases: each rule on its own; **boundaries** (intake exactly 9 months, 9 months + 1 day, exactly 18 months); intake in the past; intake missing; MOI counts as English; "test booked" counts; funding scholarship-only blocks Hot; country not served blocks Hot; no phone → never above Cold; each flag (refusal, gap ≥ 5 exactly and 4, scholarship-only); "today" injected (never read the real clock inside the function); month arithmetic across year end (Nov → Aug next year).
 - Manual check: none.
@@ -196,7 +210,7 @@ Levels group portions. Finish a level before starting the next one. Every portio
 
 **P4.3 Tools**
 - Files: `app/tools.py`, `tests/test_tools.py`. PRD refs: §9.4, §5.2.
-- Corner cases: every tool schema is strict (`additionalProperties: false`); server-side validation re-runs even though the API validates; invalid phone → tool result tells the model what's wrong (no exception); `update_profile` with an empty object → no-op; unknown field → rejected; under-18 → phone and results not stored; `book_counselling` on a full slot → "slot taken" result with alternatives; `book_counselling` on a past slot → rejected; `request_handoff` twice → one handoff; unknown tool name → error result; tool input that isn't valid JSON → error result; tools can only touch the current contact (tested by passing another contact's id → ignored).
+- Corner cases: every tool schema is strict (`additionalProperties: false`); server-side validation re-runs even though the API validates; invalid phone → tool result tells the model what's wrong (no exception); `update_profile` with an empty object → no-op; unknown field → rejected; under-18 → `adult = false` recorded and the phone **is** stored (D-014); `book_counselling` on a full slot → "slot taken" result with alternatives; `book_counselling` on a past slot → rejected; `request_handoff` twice → one handoff; unknown tool name → error result; tool input that isn't valid JSON → error result; tools can only touch the current contact (tested by passing another contact's id → ignored).
 - Manual check: none.
 
 **P4.4 Conversation engine**
@@ -227,7 +241,7 @@ Levels group portions. Finish a level before starting the next one. Every portio
 
 ### Level 7: Quality and operations
 
-**P7.1 Evals + Gemini + bake-off**: eval runner; ≥ 60 cases incl. ≥ 20 Banglish; Gemini function (from official `google-genai` docs); bake-off table in `research/model_bakeoff.md`.
+**P7.1 Evals + Gemini + bake-off**: eval runner (core) reading each pack's eval questions; study_abroad pack ≥ 60 cases incl. ≥ 20 Banglish; Gemini function (from official `google-genai` docs); bake-off table in `research/model_bakeoff.md`.
 **P7.2 Production readiness**: Dockerfile, `railway.toml`, load test (20 msg/s, 5 min), restore drill, alerts firing test, runbooks, Dedicated deploy + release script.
 
 ### Level 8: Pilot features

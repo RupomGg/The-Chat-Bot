@@ -27,6 +27,7 @@ EXPECTED_TABLES = {
     "jobs",
     "audit_events",
     "wa_billable",
+    "bot_turns",
 }
 
 
@@ -141,7 +142,7 @@ def test_no_floating_point_columns(conn):
 def test_cost_is_exact_numeric(conn):
     row = conn.execute(
         "SELECT data_type, numeric_precision, numeric_scale FROM information_schema.columns "
-        "WHERE table_name='messages' AND column_name='cost_usd'"
+        "WHERE table_name='bot_turns' AND column_name='cost_usd'"
     ).fetchone()
     assert row == ("numeric", 10, 6)
 
@@ -229,6 +230,14 @@ def test_tenant_defaults(conn):
         [],
         {},
     )
+
+
+def test_tenant_industry_default_and_format(conn):
+    assert one(conn, "SELECT industry FROM tenants WHERE id=%s", (tenant(conn),)) == "study_abroad"
+    tenant(conn, slug="pets", industry="pet_care")
+    for bad in ("Pet Care", "pet-care", "1pets", "p", ""):
+        with pytest.raises(errors.CheckViolation):
+            tenant(conn, slug="bad-industry", industry=bad)
 
 
 def test_tenant_slug_unique(conn):
@@ -423,9 +432,10 @@ def test_contact_orphan_channel_rejected(conn, world):
         {"phone": "01712345678"},  # not E.164
         {"phone": "+0171234567"},
         {"phone": "+88017123456789012"},  # too long
-        {"adult": False, "phone": "+8801712345678"},  # minor: phone must not be stored
         {"score": "hottest"},
         {"status": "maybe"},
+        {"status": "enrolled"},  # consultancy-specific stage, replaced in 002
+        {"status": "counselling_booked"},
         {"profile": "[]"},
         {"source_ad": '"ad"'},
     ],
@@ -446,10 +456,25 @@ def test_contact_valid_values(conn, world):
         phone="+8801712345678",
         adult=True,
         score="hot",
-        status="counselling_booked",
+        status="booked",
         profile='{"intake": "2027-01"}',
     )
-    contact(conn, w["t"], w["ch"], "u3", adult=False)  # minor without phone is fine
+    contact(conn, w["t"], w["ch"], "u3", adult=False)  # minor without phone
+
+
+@pytest.mark.parametrize(
+    "stage", ["new", "contacted", "qualified", "booked", "in_progress", "won", "lost"]
+)
+def test_contact_generic_stages(conn, world, stage):
+    w = world["a"]
+    contact(conn, w["t"], w["ch"], f"stage-{stage}", status=stage)
+
+
+def test_minor_phone_is_stored_owner_decision(conn, world):
+    # D-014: the owner chose to store every phone number, including under-18s.
+    w = world["a"]
+    c = contact(conn, w["t"], w["ch"], "minor", adult=False, phone="+8801712345678")
+    assert one(conn, "SELECT phone FROM contacts WHERE id=%s", (c,)) == "+8801712345678"
 
 
 def test_contact_assignee_must_be_same_tenant(conn, world):
@@ -511,11 +536,6 @@ def test_message_external_id_unique_per_conversation(conn, world):
 @pytest.mark.parametrize(
     "cols",
     [
-        {"cost_usd": -0.000001},
-        {"input_tokens": -1},
-        {"output_tokens": -1},
-        {"cache_read_tokens": -1},
-        {"cache_write_tokens": -1},
         {"content": ""},
     ],
 )
@@ -525,10 +545,111 @@ def test_message_rejects_invalid(conn, world, cols):
         message(conn, w["t"], w["conv"], **cols)
 
 
-def test_message_cost_keeps_six_decimals(conn, world):
+def test_messages_hold_content_only(conn):
+    cols = [
+        r[0]
+        for r in conn.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name='messages'"
+            " ORDER BY ordinal_position"
+        )
+    ]
+    assert cols == [
+        "id",
+        "tenant_id",
+        "conversation_id",
+        "role",
+        "content",
+        "external_id",
+        "created_at",
+    ]
+
+
+# ---------- bot_turns (performance log, D-013) ----------
+
+
+def turn(conn, t, conv, **cols):
+    base = {"source": "llm", "channel": "messenger", "model": "claude-haiku-4-5"}
+    return insert(conn, "bot_turns", tenant_id=t, conversation_id=conv, **{**base, **cols})
+
+
+def test_bot_turn_full_row(conn, world):
     w = world["a"]
-    m = message(conn, w["t"], w["conv"], cost_usd="0.000123")
-    assert str(one(conn, "SELECT cost_usd FROM messages WHERE id=%s", (m,))) == "0.000123"
+    tid = turn(
+        conn,
+        w["t"],
+        w["conv"],
+        message_id=123,
+        received_at=NOW,
+        language="banglish",
+        latency_ms=2300,
+        llm_ms=1900,
+        input_tokens=1500,
+        cache_read_tokens=1200,
+        cache_write_tokens=0,
+        output_tokens=180,
+        cost_usd="0.000123",
+        tool_calls=["update_profile", "list_slots"],
+        stop_reason="end_turn",
+    )
+    row = conn.execute(
+        "SELECT cost_usd, tool_calls, created_at IS NOT NULL FROM bot_turns WHERE id=%s", (tid,)
+    ).fetchone()
+    assert (str(row[0]), row[1], row[2]) == ("0.000123", ["update_profile", "list_slots"], True)
+
+
+@pytest.mark.parametrize(
+    "cols",
+    [
+        {"source": "magic"},
+        {"channel": "sms"},
+        {"language": "klingon"},
+        {"latency_ms": -1},
+        {"llm_ms": -1},
+        {"input_tokens": -1},
+        {"cache_read_tokens": -1},
+        {"cache_write_tokens": -1},
+        {"output_tokens": -1},
+        {"cost_usd": "-0.000001"},
+        {"source": "llm", "model": None},  # an AI reply must name its model
+        {"source": "quick", "model": None, "cost_usd": "0.01"},  # button answers cost nothing
+        {"error_code": "x" * 101},
+    ],
+)
+def test_bot_turn_rejects_invalid(conn, world, cols):
+    w = world["a"]
+    with pytest.raises(errors.CheckViolation):
+        turn(conn, w["t"], w["conv"], **cols)
+
+
+def test_bot_turn_quick_answer_without_model(conn, world):
+    w = world["a"]
+    turn(conn, w["t"], w["conv"], source="quick", model=None, cost_usd="0")
+
+
+def test_bot_turn_cannot_use_another_tenants_conversation(conn, world):
+    with pytest.raises(errors.ForeignKeyViolation):
+        turn(conn, world["a"]["t"], world["b"]["conv"])
+
+
+def test_bot_turn_survives_message_deletion(conn, world):
+    # Metrics outlive message text (retention deletes messages, keeps performance history).
+    w = world["a"]
+    m = message(conn, w["t"], w["conv"], role="bot", content="reply")
+    turn(conn, w["t"], w["conv"], message_id=m)
+    conn.execute("DELETE FROM messages WHERE id=%s", (m,))
+    assert one(conn, "SELECT count(*) FROM bot_turns WHERE message_id=%s", (m,)) == 1
+
+
+def test_bot_turns_hold_no_text_columns(conn):
+    # Only metadata: no free-text column could hold a message or phone number.
+    text_cols = {
+        r[0]
+        for r in conn.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name='bot_turns' AND data_type IN ('text', 'jsonb')"
+        )
+    }
+    assert text_cols == {"source", "channel", "model", "language", "stop_reason", "error_code"}
 
 
 def test_message_cannot_use_another_tenants_conversation(conn, world):

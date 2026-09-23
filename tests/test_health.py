@@ -46,7 +46,11 @@ def test_startup_runs_migrations_and_opens_pool(config):
     with TestClient(app):
         with app.state.pool.connection() as conn:
             names = conn.execute("SELECT name FROM schema_version ORDER BY version").fetchall()
-        assert names == [("000_schema_version.sql",), ("001_init.sql",)]
+        assert names == [
+            ("000_schema_version.sql",),
+            ("001_init.sql",),
+            ("002_universal_core.sql",),
+        ]
     assert app.state.pool.closed  # shutdown closes the pool
 
 

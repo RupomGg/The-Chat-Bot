@@ -124,13 +124,53 @@ Every decision and every file created, changed or deleted is recorded here, newe
 
 ### D-010 Tenant isolation enforced by the database
 - Date: 2026-09-23
-- Status: **proposed**, needs owner confirmation
+- Status: **accepted** (owner signed off P1.2, which is built on it, 2026-09-23)
 - Context: PRD §10 gives tables a `tenant_id`, but plain foreign keys would still let the database store, for example, client A's contact on client B's channel if app code had a bug. Tenant mix-ups are the worst kind of bug for a multi-client product (one consultancy seeing another's students).
 - Options: A) Plain foreign keys; rely on app code (P6.1 cross-tenant tests) only. B) Composite foreign keys `(tenant_id, parent_id)` → `UNIQUE (tenant_id, id)` on parents, plus `tenant_id` on `messages`, `notes`, `event_registrations`.
 - Decision (built this way in P1.2): **B**, as a second line of defence under the app-level checks.
 - Also in the schema: no foreign key cascades or nulls anything (deleting a client with data is refused); minors (`adult = false`) can't have a phone stored; knowledge can't be published unless its evals passed; one web channel per client; no double booking of the same slot by the same student; a global audit event can't reference a conversation (a composite FK is skipped when a column is NULL).
 - Why: invalid data becomes impossible, not just unlikely. Cost: one extra column on three tables and slightly longer FK definitions.
 - Affects: `migrations/001_init.sql`, PRD §10 (as-built note added), every later portion that inserts rows (must pass `tenant_id`).
+
+### D-011 Security parameters
+- Date: 2026-09-23
+- Status: **accepted** (owner, 2026-09-23): "password minimum 8 digit with regular rules, do OWASP, 8 hours", "no Bangla text or emoji allowed"; confirmed "regular login: 8+ with uppercase, lowercase, special character and number; rest keep secure"
+- Context: P1.3 needed concrete values for password hashing, password rules and CSRF tokens. First version used 12-256 characters, any characters (NFKC-normalized) and 12-hour CSRF tokens; the owner changed them.
+- Options discussed for password rules: A) OWASP style: 8+ characters, any characters, no forced composition, block the ~10,000 most common passwords (needs a list download). B) Classic composition rules. C) Both. The owner asked for "regular rules", OWASP hashing, and no Bangla/emoji, and didn't approve the list download.
+- Decision (built):
+  - Staff passwords: **8-256 characters; standard keyboard characters only** (printable ASCII: English letters, digits, symbols, spaces; Bangla, emoji, accented letters, tabs, newlines, NUL and non-breaking spaces are rejected); **must contain an uppercase letter, a lowercase letter, a digit (ASCII only; Bangla, Arabic-Indic and full-width digits don't count) and a symbol** (a space is not a symbol). The error lists every broken rule at once.
+  - Hashing at **OWASP** strength: stdlib `hashlib.scrypt`, **N=2^14, r=8, p=5** (OWASP's equivalent low-memory row: 16 MiB per login instead of 128 MiB at N=2^17, p=1; measured 0.5 s vs 0.8 s per login; changed in C-013 after the owner asked whether security was excessive and said "rest keep secure"), 16-byte salt, stored as `scrypt$N$r$p$salt$hash` (parameters can be raised later without breaking logins). Unicode normalization removed (passwords are ASCII only now).
+  - Login attempts over 1,024 characters are rejected without hashing.
+  - CSRF tokens: **8 hours**, bound to the session id, up to 60 s clock skew, signed with a key derived for CSRF only.
+  - Webhook checks: Meta `X-Hub-Signature-256` (exactly `sha256=` + 64 hex) and Telegram's secret header (exact match), both constant-time; malformed input returns False, never raises.
+- Not included (can be added later with owner approval): a common/breached-password block list. OWASP recommends it; composition rules alone let predictable passwords like `Password1!` through.
+- Affects: `app/security.py`, `tests/test_security.py`; later P6.1 (login, CSRF).
+
+### D-012 Universal core + industry packs
+- Date: 2026-09-23
+- Status: **accepted** (owner, 2026-09-23): "I want to make my bot universal for any project ... a financial institution ... a pet care centre"
+- Context: everything so far was framed for study-abroad consultancies. The owner wants any kind of business later.
+- Options: A) Stay consultancy-only and rewrite later. B) Universal core + one "industry pack" per industry (settings and text, no code), study_abroad first. C) Build many packs now.
+- Decision: **B.** The core (channels, AI engine, inbox, bookings, jobs, security, billing, performance log) never hard-codes an industry; each tenant has `industry`, and the engine loads that pack (profile fields, scoring rules, stage labels, prompt, knowledge template, quick answers, eval questions, compliance notes). Only the study_abroad pack is built until a real client in another industry signs. Sales keep targeting one industry at a time.
+- Database: generic pipeline stages `new, contacted, qualified, booked, in_progress, won, lost` (`in_progress` added so stages like "counselled/applied" keep a slot); `tenants.industry` defaulting to `study_abroad`.
+- Why: pivoting is cheap now (only `contacts.status` in built code was industry-specific) and expensive later.
+- Caution: regulated industries (finance, health) need their own compliance rules and legal review before launch.
+- Affects: `migrations/002_universal_core.sql`, PRD §0/§5.3/§10, INSTRUCTION.md Level 2 (new P2.0 pack loader) and P2.3/P4.3/P7.1.
+
+### D-013 Performance log (`bot_turns`)
+- Date: 2026-09-23
+- Status: **accepted** (owner, 2026-09-23): "log ... other logs the bot can collect for performance optimization later"
+- Decision: new table `bot_turns`, one row per bot reply, **metadata only**: message id (plain reference), when the student's message arrived, source (`quick`/`llm`/`fallback`/`handoff`), channel, model, language, total latency, AI time, tokens (input, cache read/write, output), exact cost, tools used, stop reason, error code. No message text and no phone number, so it can be kept after message text is deleted by retention. AI usage moved here from `messages` (which now hold content only). Funnel events (button clicks, bookings, handoffs) keep going to `audit_events`.
+- Rules in the database: an AI reply must name its model; a button answer can't cost money; no negative times, tokens or cost; error code ≤ 100 characters; tied to its tenant by composite key.
+- Affects: `migrations/002_universal_core.sql`, PRD §10; later P4.2/P4.4 (write a row per reply), P6.3 (usage view), P7.2 (retention: keep `bot_turns` longer than messages).
+
+### D-014 Minors' phone numbers are stored (owner-accepted legal risk)
+- Date: 2026-09-23
+- Status: **accepted** (owner, 2026-09-23): chose "Always store it" over storing with a consent flag, a scrambled copy, or not storing
+- Context: 001 made the database refuse a phone number when `adult = false` (Bangladesh PDP Act 2026 requires verifiable parental consent for under-18s; fines up to ৳25 lakh, risk mainly on the consultancy).
+- Decision: every student's phone number is stored, including under-18s. `adult` is still recorded; the bot suggests a guardian join counselling.
+- Risk and mitigation: **owner-accepted legal risk.** Before the first consultancy signs, a lawyer should confirm how its privacy notice/DPA covers parental consent. Revisit this decision if a client or regulator objects; a consent flag can be added later without losing data.
+- Affects: `migrations/002_universal_core.sql` (drops `contacts_check`), PRD §5.2/§12.3/§17/Appendix A/Appendix C, INSTRUCTION.md P4.3.
 
 ---
 
@@ -341,6 +381,111 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - G8: real migrated database, every table's columns listed and compared with PRD §10: all present; differences are the deliberate D-010 additions (recorded in PRD §10)
   - G9: this entry
 - `# pragma: no cover` uses: none
+- Owner sign-off: **yes (2026-09-23)**
+
+### C-011 Portion P1.3: Security helpers
+- Date: 2026-09-23
+- Type: portion
+- New files:
+  - `app/security.py`: `encrypt`/`decrypt` (Fernet; `DecryptionError` for wrong key, tampering or garbage, message never contains a key); `hash_password`/`verify_password` (scrypt, NFKC, 12-256 chars via `PasswordPolicyError`, parameters read from each stored hash, malformed or absurd stored hashes → False, overlong attempts → False without hashing, constant-time compare); `verify_meta_signature`; `verify_telegram_secret`; `make_csrf_token`/`check_csrf_token`.
+  - `tests/test_security.py`: 86 tests. Encryption: round-trips (empty, Bangla, 10,000 chars, JSON), different ciphertext each time, wrong key, one flipped bit, garbage, key not leaked. Passwords: right/wrong (case, spaces, truncation), random salt, stored format and OWASP parameters, Bangla, NFD vs NFC, old hashes with other parameters still verify, 11/12/256/257-char boundaries, overlong attempt never hashed, 11 malformed stored hashes (incl. non-power-of-two cost, zero block size, absurd cost), constant-time compare used. Meta: valid, uppercase hex, 10 bad headers (missing, no prefix, sha1, short, long, non-hex, non-ASCII, one char off), one-byte body change, wrong or empty secret, empty body. Telegram: exact match only (case, spaces, truncation, Bangla), empty expected, constant-time. CSRF: own session only, other secret, expiry boundary, future tokens vs small skew, edited timestamp, 10 malformed tokens, empty session id, domain-separated key, real clock.
+- Changed files: none
+- Deleted files: none
+- Decisions referenced: D-011 (proposed)
+- Bugs found during the portion:
+  1. **Test gap found by coverage:** the path where a stored hash has a cost in range but not a power of two (scrypt raises) was untested. Added that case plus zero block size and zero parallelism.
+  - Noted by the mutation check: without the strict hex check, a non-ASCII signature header would make `hmac.compare_digest` raise `TypeError`, crashing the webhook instead of rejecting it. The check prevents it and a test guards it.
+- Gate result (full logs saved):
+  - G1: `333 passed`
+  - G2/G3: `app/security.py` 82 stmts, 22 branches, 100%; TOTAL 258 stmts, 66 branches, **100%**
+  - G4: ruff check: All checks passed; format: 19 files already formatted
+  - G5: config-enforced; no new ignores
+  - G6: reverse order: 333 passed
+  - G7: 333 passed ×3; no problems in any saved log; `security.py` and `001_init.sql` unchanged during the gate (SHA-256 OK); 0 leftover test databases
+  - Mutation check (crash-safe, restored byte-identical): **13/13 caught** (non-constant-time compare, no NFKC, length off by one, weaker scrypt cost, overlong guard removed, decrypt swallowing errors, Meta: empty secret, missing prefix check, missing hex/length check; Telegram: whitespace stripped; CSRF: not session-bound, future tokens, expiry off by one)
+  - G8: none (pure functions, per INSTRUCTION.md)
+  - G9: this entry
+- `# pragma: no cover` uses: none
+- Owner sign-off: pending
+
+### C-012 P1.3 revised: owner's password and CSRF rules (D-011)
+- Date: 2026-09-23
+- Type: fix (requirements change by owner)
+- New files: none
+- Changed files:
+  - `tests/test_security.py`: changed **first** (18 new-rule tests failed against the old code). Password tests rewritten for 8-256 characters, ASCII only, uppercase + lowercase + digit + symbol: exact 8 and 256 accepted, 7 and 257 rejected, each rule alone, space is not a symbol, every ASCII symbol accepted, 8 non-ASCII cases rejected (Bangla, Bangla digit, emoji, accented, tab, newline, NUL, non-breaking space), non-ASCII digits (Bangla, Arabic-Indic, full-width) don't satisfy the number rule, all problems reported together, non-ASCII login attempts fail cleanly; Bangla/NFKC tests removed (no longer allowed); CSRF lifetime pinned to 8 hours. Now 107 tests.
+  - `app/security.py`: `check_password_policy` (all rules, lists every broken one); `PASSWORD_MIN` 12 → 8; `PASSWORD_CHARS` printable ASCII; NFKC normalization removed; `CSRF_MAX_AGE` 12 h → 8 h. Hashing parameters unchanged (OWASP).
+  - `DECISION.md`: D-011 accepted with the owner's values.
+- Deleted files: none
+- Decisions referenced: D-011 (accepted)
+- Bugs found:
+  1. **My edit mistake:** raw tab, newline, NUL and non-breaking-space characters landed in the test file instead of escape sequences (the newline split a string, a syntax error), plus a stray `\:` escape. Found by `grep` reporting the file as binary; lines rewritten and the file checked for control characters and parsed.
+  2. **Test gap found by the mutation check:** letting a Bangla digit count as "a number" went unnoticed because the ASCII-only rule already rejected that password. Added a test that the number rule holds on its own (Bangla, Arabic-Indic, full-width digits); now caught.
+- Gate result (full logs saved):
+  - G1: `354 passed`
+  - G2/G3: `app/security.py` 97 stmts, 34 branches, 100%; TOTAL 273 stmts, 78 branches, **100%**
+  - G4: ruff check: All checks passed; format: 19 files already formatted
+  - G5: config-enforced; no new ignores
+  - G6: reverse order: 354 passed
+  - G7: 354 passed ×3; no problems in any saved log; `security.py` and `001_init.sql` unchanged during the gate; 0 leftover test databases
+  - Mutation check (crash-safe, restored byte-identical): **18/18 caught** (compare not constant-time, min 7, max 257, non-ASCII allowed, no uppercase rule, no lowercase rule, Bangla digit counts as number, space counts as symbol, weaker scrypt, overlong guard removed, decrypt swallows errors, Meta: empty secret, no hex/length check; Telegram strips whitespace; CSRF: not session-bound, future tokens, 12 h lifetime, expiry off by one)
+  - G9: this entry
+- Note: full gate run time is now ~4 min (O-006 threshold is 5 min).
+- `# pragma: no cover` uses: none
+- Owner sign-off: pending (covers C-011 + C-012)
+
+### C-013 Password hashing memory: 128 MiB → 16 MiB per login (same OWASP strength)
+- Date: 2026-09-23
+- Type: fix (resource risk)
+- Why: at N=2^17, r=8, p=1 each login needed 128 MiB of RAM, so ~5 simultaneous staff logins could exhaust a 512 MB-1 GB container and crash the server. OWASP lists N=2^14, r=8, p=5 as an equivalent setting. Measured locally: 16 MiB and ~0.5 s per login (was 128 MiB and ~0.8 s).
+- New files: none
+- Changed files:
+  - `tests/test_security.py`: changed **first** (2 tests failed against the old value): stored-hash parameters must be (2^14, 8, 5); new test that one login uses at most 16 MiB. Now 108 tests. Existing hashes made with other parameters still verify (unchanged test).
+  - `app/security.py`: `SCRYPT_N, SCRYPT_R, SCRYPT_P = 2**14, 8, 5` with the reason in a comment.
+  - `DECISION.md`: D-011 updated.
+- Deleted files: none
+- Decisions referenced: D-011
+- Bugs found: **my edit mistake**: the new test was inserted in the middle of an existing one, moving its last line (`assert PASSWORD not in stored`) into the new test (TypeError). Moved back; both pass.
+- Gate result (full logs saved):
+  - G1: `355 passed`
+  - G2/G3: TOTAL 273 stmts, 78 branches, **100%**
+  - G4: ruff check: All checks passed; format: 19 files already formatted
+  - G6: reverse order: 355 passed
+  - G7: 355 passed ×3; no problems in any saved log; `security.py` and `001_init.sql` unchanged during the gate; 0 leftover test databases
+  - Mutation check (crash-safe, restored byte-identical): **19/19 caught**, incl. the new "weaker cost (p=1)" and "back to 128 MiB per login"
+  - G9: this entry
+- `# pragma: no cover` uses: none
+- Owner sign-off: pending (covers C-011, C-012, C-013)
+
+### C-014 Migration 002: universal core, performance log, minors' phones (+ PC crash recovery)
+- Date: 2026-09-23
+- Type: refactor (schema upgrade) + docs
+- New files:
+  - `migrations/002_universal_core.sql`: `tenants.industry` (default `study_abroad`, format-checked); `contacts.status` → generic stages `new, contacted, qualified, booked, in_progress, won, lost` with old values mapped (counselling_booked → booked, counselled/applied → in_progress, enrolled → won); drops the minor-phone rule (D-014); new `bot_turns` performance table (D-013) with its rules and indexes; moves existing AI usage from `messages` into `bot_turns` (button answers recorded as `quick` with no model); drops usage columns from `messages`. `001_init.sql` untouched.
+  - `tests/test_migration_002.py`: 5 upgrade-path tests on a database at 001 filled with old-style rows: every old stage mapped correctly, no contact or message lost, usage moved exactly (incl. `quick` rows), `messages` content-only, existing tenants get `study_abroad`.
+- Changed files:
+  - `tests/test_schema.py`: now 138 tests: `bot_turns` in the table list; exact-cost check moved to `bot_turns`; old consultancy stages rejected, all 7 generic stages accepted; minor's phone stored (D-014); messages hold content only; `bot_turns`: full row, 13 invalid cases (source, channel, language, negative times/tokens/cost, AI reply without model, paid button answer, overlong error code), button answer without model, tenant binding, survives deletion of its message, no free-text columns beyond the 6 short metadata fields; `industry` default and format.
+  - `tests/test_db.py`, `tests/test_fixtures.py`, `tests/test_health.py`: expect `002_universal_core.sql` among applied migrations.
+  - `PRD.md` (v2.2): new §0 universal core + industry packs; §5.2 and minors paragraph; §5.3 marked as study_abroad pack rules; §10 as-built note for 002; §12.3 and §17 risk updated; Appendix A prompt and Appendix C minor case updated.
+  - `INSTRUCTION.md`: new portion **P2.0 industry pack loader** (first in Level 2) and the rule that Levels 2-7 read industry rules from packs; P2.3, P4.3, P7.1 updated; new gate rules: capture stderr and exit codes; after-crash checklist.
+  - `DECISION.md`: D-012, D-013, D-014 accepted; O-008 lawyer review.
+- Deleted files: none
+- Decisions referenced: D-010, D-012, D-013, D-014
+- **PC crash during the work** (while the database tests were running):
+  1. `tests/test_migration_002.py` was left as 5,081 zero bytes (space reserved, content never written). Restored from the exact text written earlier in the session; checked: no NUL bytes, parses.
+  2. All other project files scanned: no damage. `app/security.py` and `migrations/001_init.sql` matched their saved SHA-256 fingerprints. `.coverage` (binary), empty `__init__.py` files and `dependency_links.txt` are empty/binary by design.
+  3. PostgreSQL service came back running; no leftover test databases.
+  4. **The crash also corrupted `.ruff_cache`** (package root recorded as blank bytes). Ruff then panicked on every file in `tests/` and reported nothing on stdout. **My earlier "lint clean" statement after the crash was wrong**: my command didn't capture stderr. Found by the saved G4 log (blank summary, 10 files instead of 20). Fixed by deleting `.ruff_cache` and `__pycache__`; the real lint run then found 6 line-too-long findings and 1 unformatted file in `tests/test_migration_002.py`, now fixed. New INSTRUCTION.md rules prevent a repeat.
+- Gate result (full logs saved, stdout + stderr, exit codes):
+  - G4: ruff check exit 0 (All checks passed!); format exit 0 (20 files already formatted); no panics or warnings in either log
+  - G1: exit 0, `383 passed`
+  - G2/G3: TOTAL 273 stmts, 78 branches, **100%**
+  - G6: reverse order: 383 passed
+  - G7: 383 passed ×3
+  - No problems in any saved log; no source, test or migration file changed during the gate; 0 leftover test databases
+  - Mutation check on `002_universal_core.sql` (crash-safe, restored byte-identical): **12/12 caught** (wrong stage mapping ×2, missing `in_progress`, unchecked industry name, AI reply without model, paid button answer, unchecked error length, bot_turns not tenant-bound, usage not moved, button answers recorded as AI, usage columns kept on messages, negative latency)
+  - G9: this entry
+- `# pragma: no cover` uses: none
 - Owner sign-off: pending
 
 ### Existing files at the start of the log
@@ -355,4 +500,6 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - **O-003** (resolved 2026-09-23) Intermittent "1 error" in the test suite. Root cause: autovacuum race on `DROP DATABASE WITH (FORCE)` in the test fixture (C-008). Fixed with bounded retry + tests. **If any unexplained error appears again, P1.1 re-opens.**
 - **O-005** Tenant `timezone` is only checked for non-empty in the database (a CHECK can't look up the timezone list). Validate it against `zoneinfo.available_timezones()` in the operator console when a tenant is created or edited (P6.3).
 - **O-006** Gate time grew to ~2.5 min per full run (247 tests, most creating a database). If it passes ~5 min, consider running tests in parallel (would need a new dev dependency, so a decision).
+- **O-007** Encryption-key rotation (PRD §12.2): `encrypt`/`decrypt` use one `FERNET_KEY`. Add rotation (e.g. `MultiFernet` with old + new keys, then re-encrypt stored secrets) with its runbook in P7.2.
+- **O-008** Before the first client signs: lawyer review of guardian consent for under-18 phone numbers (D-014) and of the DPA template.
 - **O-004** The test role `chatbot_test` isn't a superuser (good), so tests can't use superuser-only features. If a later portion needs one (e.g. an extension), grant it explicitly and log a decision; never make the test role a superuser.
