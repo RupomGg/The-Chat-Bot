@@ -1,0 +1,71 @@
+# Minimal second industry, used by tests to prove the core isn't study-abroad-only.
+name = "pet_care_sample"
+display_name = "Pet care centre (sample)"
+version = 1
+
+[tenant_settings]
+services_offered = "list"
+
+[stages]
+new = { en = "New", bn = "নতুন" }
+contacted = { en = "Contacted", bn = "যোগাযোগ হয়েছে" }
+qualified = { en = "Qualified" }
+booked = { en = "Appointment booked" }
+in_progress = { en = "Visit in progress" }
+won = { en = "Visited" }
+lost = { en = "Lost" }
+
+[[fields]]
+name = "pet_name"
+type = "text"
+priority = "medium"
+label = { en = "Pet's name" }
+
+[[fields]]
+name = "species"
+type = "choice"
+choices = ["dog", "cat", "bird", "other"]
+priority = "high"
+label = { en = "Species", bn = "প্রাণী" }
+
+[[fields]]
+name = "pet_age_years"
+type = "int"
+priority = "low"
+label = { en = "Pet's age (years)" }
+
+[[fields]]
+name = "needs"
+type = "list"
+priority = "high"
+label = { en = "Services needed" }
+
+[[fields]]
+name = "vaccinated"
+type = "bool"
+priority = "medium"
+label = { en = "Vaccinated" }
+
+[[fields]]
+name = "visit_month"
+type = "yearmonth"
+priority = "medium"
+label = { en = "Preferred month" }
+
+[scoring]
+hot = [
+    { field = "phone", op = "present" },
+    { field = "needs", op = "overlaps_setting", setting = "services_offered" },
+    { any = [
+        { field = "species", op = "in", values = ["dog", "cat"] },
+        { field = "pet_age_years", op = "gte", value = 10 },
+    ] },
+    { field = "visit_month", op = "within_months", months = 1 },
+]
+warm = [
+    { field = "phone", op = "present" },
+]
+flags = [
+    { name = "not_vaccinated", when = [{ field = "vaccinated", op = "eq", value = false }] },
+    { name = "senior_pet", when = [{ field = "pet_age_years", op = "gte", value = 10 }] },
+]

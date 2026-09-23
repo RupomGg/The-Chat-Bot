@@ -406,7 +406,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - G8: none (pure functions, per INSTRUCTION.md)
   - G9: this entry
 - `# pragma: no cover` uses: none
-- Owner sign-off: pending
+- Owner sign-off: yes (2026-09-23), by asking to go to P2.0
 
 ### C-012 P1.3 revised: owner's password and CSRF rules (D-011)
 - Date: 2026-09-23
@@ -432,7 +432,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - G9: this entry
 - Note: full gate run time is now ~4 min (O-006 threshold is 5 min).
 - `# pragma: no cover` uses: none
-- Owner sign-off: pending (covers C-011 + C-012)
+- Owner sign-off: yes (2026-09-23), by asking to go to P2.0
 
 ### C-013 Password hashing memory: 128 MiB → 16 MiB per login (same OWASP strength)
 - Date: 2026-09-23
@@ -455,7 +455,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - Mutation check (crash-safe, restored byte-identical): **19/19 caught**, incl. the new "weaker cost (p=1)" and "back to 128 MiB per login"
   - G9: this entry
 - `# pragma: no cover` uses: none
-- Owner sign-off: pending (covers C-011, C-012, C-013)
+- Owner sign-off: yes (2026-09-23), by asking to go to P2.0
 
 ### C-014 Migration 002: universal core, performance log, minors' phones (+ PC crash recovery)
 - Date: 2026-09-23
@@ -486,6 +486,34 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - Mutation check on `002_universal_core.sql` (crash-safe, restored byte-identical): **12/12 caught** (wrong stage mapping ×2, missing `in_progress`, unchecked industry name, AI reply without model, paid button answer, unchecked error length, bot_turns not tenant-bound, usage not moved, button answers recorded as AI, usage columns kept on messages, negative latency)
   - G9: this entry
 - `# pragma: no cover` uses: none
+- Owner sign-off: yes (2026-09-23), by asking to go to P2.0
+
+### C-015 Portion P2.0: Industry pack loader
+- Date: 2026-09-23
+- Type: portion
+- New files:
+  - `app/packs.py`: `load_pack(name, packs_dir)` reads `packs/<name>/` (`pack.toml`, `prompt.md`, `knowledge_template.md`) with stdlib `tomllib` and validates everything, **listing every problem at once**; returns an immutable `Pack` (fields, stage labels, scoring rules as `Condition`/`Flag` objects, tenant settings, prompt, knowledge template). Checks: pack name format **before touching disk** (blocks `../` path escapes), name = folder, required files, UTF-8, valid TOML, unknown keys anywhere (typo catcher), display name, version; all 7 generic stages with an `en` label and valid language codes; field names, types (`text/int/bool/choice/list/yearmonth`), priorities, labels, choices (only on choice fields, non-empty, unique), no shadowing of built-ins `phone`/`name`/`adult`; scoring `hot`/`warm` required, conditions refer to real fields, op allowed for the field's type, right arguments (`value`/`values`/`months` 1-120/`setting`), values must be real choices / true-false / whole numbers (true is not a number), `any` groups, flags unique and well-formed, referenced tenant settings declared; prompt placeholders only `{{business_name}}` and `{{knowledge_markdown}}` (required), no malformed `{{`/`}}`; knowledge template not empty. Evaluating the rules is P2.3.
+  - `packs/study_abroad/pack.toml`: 13 fields (PRD §5.2), Hot/Warm rules and 3 flags (PRD §5.3), English + Bangla stage labels, tenant setting `served_countries`.
+  - `packs/study_abroad/prompt.md`, `packs/study_abroad/knowledge_template.md`: extracted from PRD Appendix A/B by script (so they match the PRD), `{{consultancy_name}}` → `{{business_name}}`.
+  - `tests/fixtures/packs/pet_care_sample/` (3 files): a small second industry proving the core isn't study-abroad-only; also the base for every broken-pack test.
+  - `tests/test_packs.py`: 97 tests: real study_abroad pack loads (fields, stages in English and Bangla, rules, flags, placeholders, settings); pet-care pack loads (Bangla survives); equal on reload; immutable; nested `any`; 9 bad pack names incl. `../secrets`; missing folder; each missing file named; name/folder mismatch; invalid TOML; non-UTF-8; unknown keys; bad display name/version; stage missing/unknown/no `en`/empty/bad language code; field type, duplicate, built-in shadowing ×3, name format ×4, choices missing/empty/duplicate/on non-choice fields, priority, typo'd key, `en` label, no fields; rules on unknown fields, unknown ops, wrong choices, 12 bad argument cases, undeclared setting, wrong field type for an op, empty/mixed `any`, missing `warm`, duplicate/badly named flags, empty `when`, setting types; prompt placeholder required/unknown/malformed ×3/empty; empty knowledge template; every problem listed; plus 15 wrong-shape cases (text where a table is expected, etc.) and 7 value-type cases.
+- Changed files: none (DECISION.md: this entry, sign-offs, open items)
+- Deleted files: none
+- Decisions referenced: D-012
+- Bugs found:
+  1. **Loader bug, found by the tests:** a field with a misspelled type (e.g. `"boolean"`) was reported, but any scoring rule using that field then crashed the loader with `KeyError` instead of a clean message. Fixed; a mutation check confirms the tests catch the crash if the guard is removed.
+  2. **Coverage found 19 untested lines** (wrong-shape input: text where a table was expected, etc.). Added 22 tests; now 100%.
+  3. **Windows console encoding:** printing Bangla while output was redirected crashed with `UnicodeEncodeError` (cp1252). Not a loader bug, but a future-logging risk: see O-009.
+- Gate result (full logs saved, stdout + stderr, exit codes):
+  - G4: ruff check exit 0; format exit 0 (26 files already formatted)
+  - G1: exit 0, `480 passed`
+  - G2/G3: `app/packs.py` 294 stmts, 150 branches, 100%; TOTAL 567 stmts, 228 branches, **100%**
+  - G6: reverse order: 480 passed
+  - G7: 480 passed ×3; no problems in any saved log; no source, test or pack file changed during the gate; 0 leftover test databases
+  - Mutation check (crash-safe, restored byte-identical): **15/15 caught** (pack-name check removed/path escape, name-folder mismatch, unknown keys allowed, choice values unchecked, undeclared setting, built-in shadowing, `en` label optional, missing stage, knowledge placeholder optional, malformed placeholder, months 121, bool unchecked, true counts as a number, bad-type guard removed, only first problem reported)
+  - G8: study_abroad pack loaded and printed: 13 fields; stages in English and Bangla (Bangla verified in the UTF-8 output file); Hot = phone present AND intake within 9 months AND (English score present OR test is MOI/booked) AND funding ≠ scholarship-only AND a target country the consultancy serves; Warm = phone AND target country AND intake within 18 months; flags refusal, long_gap, scholarship_only; matches PRD §5.3
+  - G9: this entry
+- `# pragma: no cover` uses: none
 - Owner sign-off: pending
 
 ### Existing files at the start of the log
@@ -502,4 +530,6 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - **O-006** Gate time grew to ~2.5 min per full run (247 tests, most creating a database). If it passes ~5 min, consider running tests in parallel (would need a new dev dependency, so a decision).
 - **O-007** Encryption-key rotation (PRD §12.2): `encrypt`/`decrypt` use one `FERNET_KEY`. Add rotation (e.g. `MultiFernet` with old + new keys, then re-encrypt stored secrets) with its runbook in P7.2.
 - **O-008** Before the first client signs: lawyer review of guardian consent for under-18 phone numbers (D-014) and of the DPA template.
+- **O-009** Windows console encoding (cp1252) can't print Bangla when output is redirected. When structured logging is built (P7.2), write logs as UTF-8 explicitly (e.g. `sys.stdout.reconfigure(encoding="utf-8")` or `PYTHONUTF8=1` in the service settings) and test a Bangla log line.
+- **O-010** `packs/study_abroad/prompt.md` and `knowledge_template.md` are now the source of truth; PRD Appendix A/B are copies. Change the pack files first and keep the PRD in step (or replace the appendices with pointers). The Docker image must include `packs/` (P7.2).
 - **O-004** The test role `chatbot_test` isn't a superuser (good), so tests can't use superuser-only features. If a later portion needs one (e.g. an extension), grant it explicitly and log a decision; never make the test role a superuser.

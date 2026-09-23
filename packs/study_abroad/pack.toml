@@ -1,0 +1,123 @@
+# Study-abroad consultancies (Bangladesh first). PRD §5.2 fields, §5.3 scoring.
+name = "study_abroad"
+display_name = "Study-abroad consultancy"
+version = 1
+
+[tenant_settings]
+served_countries = "list"  # destinations this consultancy handles, e.g. ["uk", "malaysia"]
+
+[stages]
+new = { en = "New", bn = "নতুন" }
+contacted = { en = "Contacted", bn = "যোগাযোগ হয়েছে" }
+qualified = { en = "Qualified", bn = "যোগ্য" }
+booked = { en = "Counselling booked", bn = "কাউন্সেলিং বুক হয়েছে" }
+in_progress = { en = "Counselled / applied", bn = "কাউন্সেলিং / আবেদন চলছে" }
+won = { en = "Enrolled", bn = "ভর্তি হয়েছে" }
+lost = { en = "Lost", bn = "হারানো" }
+
+[[fields]]
+name = "current_level"
+type = "choice"
+choices = ["ssc", "hsc", "diploma", "bachelor", "masters", "working"]
+priority = "high"
+label = { en = "Current level", bn = "বর্তমান পর্যায়" }
+
+[[fields]]
+name = "last_result"
+type = "text"
+priority = "high"
+label = { en = "Last result (e.g. HSC GPA 4.50)", bn = "সর্বশেষ ফলাফল" }
+
+[[fields]]
+name = "english_test"
+type = "choice"
+choices = ["ielts", "pte", "duolingo", "toefl", "moi", "booked", "none"]
+priority = "high"
+label = { en = "English test", bn = "ইংরেজি পরীক্ষা" }
+
+[[fields]]
+name = "english_score"
+type = "text"
+priority = "medium"
+label = { en = "English score", bn = "ইংরেজি স্কোর" }
+
+[[fields]]
+name = "study_gap_years"
+type = "int"
+priority = "medium"
+label = { en = "Study gap (years)", bn = "পড়াশোনার বিরতি (বছর)" }
+
+[[fields]]
+name = "target_countries"
+type = "list"
+priority = "high"
+label = { en = "Target countries", bn = "লক্ষ্য দেশ" }
+
+[[fields]]
+name = "target_level"
+type = "choice"
+choices = ["foundation", "diploma", "bachelor", "masters", "phd"]
+priority = "high"
+label = { en = "Target level", bn = "লক্ষ্য স্তর" }
+
+[[fields]]
+name = "subject"
+type = "text"
+priority = "medium"
+label = { en = "Subject", bn = "বিষয়" }
+
+[[fields]]
+name = "intake"
+type = "yearmonth"
+priority = "high"
+label = { en = "Intake", bn = "ইনটেক" }
+
+[[fields]]
+name = "budget_lakh_per_year"
+type = "text"
+priority = "medium"
+label = { en = "Budget per year (lakh BDT)", bn = "বছরে বাজেট (লাখ টাকা)" }
+
+[[fields]]
+name = "funding"
+type = "choice"
+choices = ["self_family", "loan", "scholarship_only"]
+priority = "medium"
+label = { en = "Funding", bn = "খরচের উৎস" }
+
+[[fields]]
+name = "previous_refusal"
+type = "text"
+priority = "medium"
+label = { en = "Previous visa refusal (country, year)", bn = "আগের ভিসা প্রত্যাখ্যান" }
+
+[[fields]]
+name = "preferred_mode"
+type = "text"
+priority = "low"
+label = { en = "Preferred branch or online", bn = "পছন্দের শাখা বা অনলাইন" }
+
+# Hot: phone, intake within 9 months, English sorted, not scholarship-only, a country we serve.
+[scoring]
+hot = [
+    { field = "phone", op = "present" },
+    { field = "intake", op = "within_months", months = 9 },
+    { any = [
+        { field = "english_score", op = "present" },
+        { field = "english_test", op = "in", values = ["moi", "booked"] },
+    ] },
+    { field = "funding", op = "ne", value = "scholarship_only" },
+    { field = "target_countries", op = "overlaps_setting", setting = "served_countries" },
+]
+# Warm: phone, a target country, intake within 18 months.
+warm = [
+    { field = "phone", op = "present" },
+    { field = "target_countries", op = "present" },
+    { field = "intake", op = "within_months", months = 18 },
+]
+# Flags are shown to the counsellor; they don't change the score.
+flags = [
+    { name = "refusal", when = [{ field = "previous_refusal", op = "present" }] },
+    { name = "long_gap", when = [{ field = "study_gap_years", op = "gte", value = 5 }] },
+    { name = "scholarship_only", when = [{ field = "funding", op = "eq", value = "scholarship_only" }] },
+]
