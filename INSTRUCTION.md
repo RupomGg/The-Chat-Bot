@@ -56,6 +56,12 @@ A portion passes only when **every** line below is true. Claude pastes the real 
 | G8 | Manual check | The portion's "Manual check" line in §4 | Owner sees it work |
 | G9 | Logged | DECISION.md entry for this portion | Lists every new/changed file, why, and the gate result |
 
+**Save full output.** Every gate command writes its complete output to a file first; the summary shown to the owner is taken from those files. Never pipe a gate run straight into `tail`. A one-off error must be traceable afterwards (lesson from P1.1, O-003).
+
+**Deliberate-bug checks (mutation checks) must be crash-safe.** Before breaking a file on purpose, copy it to a backup **outside the project**; restore from that backup in a `finally`; finish by confirming the file is byte-identical to the backup (SHA-256). At the start of any session after an interrupted check, verify the file against the backup before anything else (lesson from P1.2: an interrupted run left `001_init.sql` missing a rule until caught).
+
+**A single unexplained failure blocks the gate.** Rerunning until it's green is not a fix. Find the root cause (server logs, leftover state), fix it, add a test, log it.
+
 `# pragma: no cover` is allowed only for code that truly can't run in tests (e.g. `if __name__ == "__main__":`), and each use must be listed in the DECISION.md entry with a reason.
 
 ---
@@ -206,7 +212,7 @@ Levels group portions. Finish a level before starting the next one. Every portio
 ### Level 5: Channels (each adapter only converts inbound → engine → outbound)
 
 **P5.1 Web chat API** (`app/channels/web.py`): origin allow-list incl. `null` origin and subdomains; rate limit per visitor + per IP; SSE stream closed by the client mid-reply → no crash, reply still stored; poll endpoint; malformed JSON → 400.
-**P5.2 Widget** (`app/static/widget.js`, `demo.html`): ≤ 15 KB gz (measured); localStorage throws → in-memory fallback; network drop → retry with backoff and a visible "reconnecting"; host page CSS can't change it (Shadow DOM); keyboard and screen-reader basics; mobile width 360 px.
+**P5.2 Widget** (`app/static/widget.js`, `demo.html`): ≤ 15 KB gz (measured); localStorage throws → in-memory fallback; network drop → retry with backoff and a visible "reconnecting"; host page CSS can't change it (Shadow DOM); keyboard and screen-reader basics; mobile width 360 px. **Devices (D-009 follow-up):** manual check on a real **Android phone (Chrome)** and **iPhone (Safari)**, plus desktop Chrome, Edge, Firefox and Safari: open, type in Bangla and English with the phone keyboard, send, receive a streamed reply, rotate the screen, on-screen keyboard doesn't cover the input box, close/reopen keeps the conversation.
 **P5.3 Messenger** (`app/channels/messenger.py`): verify challenge; HMAC with per-app secret; batched entries (several messages in one webhook); echo from our own app ignored, echo from another app → pause; `referral` stored; postback payloads → quick answers; outside the 24 h window → no send; Graph API errors (expired token, user blocked the Page) → event + alert, no retry storm.
 **P5.4 WhatsApp** (`app/channels/whatsapp.py`): status callbacks (sent/delivered/read/failed) ignored for replies but logged; interactive button/list replies → quick answers; template sends only outside the window; coexistence echoes → pause; media messages → text reply; phone_number_id routing.
 **P5.5 Telegram** (`app/channels/telegram.py`): secret header; edited messages ignored; group chats ignored (private only); callback queries → quick answers; bot blocked by user → event, no retries.
@@ -234,7 +240,7 @@ Levels group portions. Finish a level before starting the next one. Every portio
 | Needed | From | Status |
 |---|---|---|
 | Python 3.13 (D-002) | P0.1 | Installed (3.13.1) |
-| PostgreSQL 16 for tests (D-003) | P1.1 | **Not installed yet**: owner installs (§5.1) |
+| PostgreSQL 18 for tests (D-003, D-008) | P1.1 | Done: 18.6, `chatbot_test` login, `TEST_DATABASE_URL` in `.env`, `pg_hba.conf` back on `scram-sha-256` (verified) |
 | Git repo + GitHub account | P0.2 | Git installed; repo not created yet |
 | Anthropic API key with spend cap | P4.2 live test | Not set |
 | Test Facebook Page + Meta app | P5.3 | Not created |
@@ -242,10 +248,10 @@ Levels group portions. Finish a level before starting the next one. Every portio
 | Telegram bot token | P5.5 | Not created |
 | Gemini API key | P7.1 | Not set |
 
-### 5.1 Installing PostgreSQL 16 on Windows (owner, before P1.1)
-1. Download the PostgreSQL 16 Windows installer from the official site (postgresql.org → Download → Windows → EDB installer), or run `winget install PostgreSQL.PostgreSQL.16` in an administrator terminal.
+### 5.1 Installing PostgreSQL 18 on Windows (owner, before P1.1)
+1. Done: PostgreSQL 18.6 installed with the official EDB installer. Stack Builder add-ons aren't needed (Cancel).
 2. During setup: keep port **5432**; set a password for the `postgres` user and save it in your password manager; Stack Builder isn't needed.
-3. Add `C:\Program Files\PostgreSQL\16\bin` to PATH if the installer didn't, then open a new terminal and check: `psql --version` shows 16.x.
+3. Add `C:\Program Files\PostgreSQL\18\bin` to PATH if the installer didn't, then open a new terminal and check: `psql --version` shows 18.x.
 4. Create a test login (in `psql -U postgres`): `CREATE ROLE chatbot_test LOGIN CREATEDB PASSWORD '<choose one>';`
 5. Put `TEST_DATABASE_URL=postgresql://chatbot_test:<password>@localhost:5432/postgres` in your local `.env` (never committed). Tests create and drop their own database with that role.
 

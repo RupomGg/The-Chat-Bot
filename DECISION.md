@@ -65,7 +65,8 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - Options: A) Install PostgreSQL 16 for Windows locally (free, fastest tests, works offline). B) Use a Neon free-tier **test branch** over the internet (nothing to install, slower, needs internet, shared by test runs). C) Install Docker Desktop and run Postgres in a container.
 - Recommendation: **A** for daily work; CI uses a Postgres service container (P0.2). Tests create and drop their own temporary database, so they never touch real data.
 - Decision: **A**, PostgreSQL 16 installed locally on Windows (same major version as PRD §8.1 and CI). Tests read `TEST_DATABASE_URL`, create a throwaway database per test session and drop it afterwards.
-- Owner action before P1.1: install PostgreSQL 16 (steps in INSTRUCTION.md §5.1).
+- Owner action before P1.1: install PostgreSQL (steps in INSTRUCTION.md §5.1).
+- **Amended by D-008:** the major version is 18, not 16.
 - Affects: `tests/conftest.py`, `.env.example`, P1.1 onward.
 
 ### D-004 Test tooling dependencies
@@ -80,7 +81,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
 
 ### D-005 Settings are added portion by portion
 - Date: 2026-09-23
-- Status: **proposed**, needs owner confirmation
+- Status: **accepted** (owner proceeded to P0.2 without objection, 2026-09-23)
 - Context: PRD Appendix E lists every environment variable for the finished product. Requiring all of them in P0.1 would force fake Meta/Telegram/Resend/Sentry values before any code uses them.
 - Options: A) Require all Appendix E variables now. B) Each portion adds the variables its own code uses, with validation and tests.
 - Decision (built this way in P0.1): **B.** P0.1 requires `ENV`, `DATABASE_URL`, `FERNET_KEY`, `SESSION_SECRET`, `PUBLIC_BASE_URL`. `SENTRY_DSN` moves to the observability portion; channel tokens move to P5.x.
@@ -89,10 +90,47 @@ Every decision and every file created, changed or deleted is recorded here, newe
 
 ### D-006 API docs pages off in production
 - Date: 2026-09-23
-- Status: **proposed**, needs owner confirmation
+- Status: **accepted** (owner proceeded to P0.2 without objection, 2026-09-23)
 - Context: FastAPI serves `/docs` and `/openapi.json` by default, which list every route to anyone.
 - Decision (built this way in P0.1): on in `test`/`staging`, off in `production` (PRD §12.2 hardening).
 - Affects: `app/main.py`.
+
+### D-007 PyYAML as a dev dependency
+- Date: 2026-09-23
+- Status: **accepted** (owner, 2026-09-23)
+- Context: GitHub Actions can't run locally, so the P0.2 corner cases (right Python version, Postgres service, gate commands, no hidden failures, no secrets) are checked by a test that reads `ci.yml`. That needs a YAML parser. PyYAML was already installed as a transitive dependency of `uvicorn[standard]`, but relying on a transitive dependency is fragile.
+- Decision (built this way in P0.2): pin `pyyaml==6.0.3` in the `[dev]` extras. Dev-only, never shipped.
+- Affects: `pyproject.toml`, `tests/test_ci.py`.
+
+### D-008 PostgreSQL 18 instead of 16
+- Date: 2026-09-23
+- Status: **accepted** (owner, 2026-09-23)
+- Context: the owner installed PostgreSQL 18.6 (EDB installer). The plan said 16. Local, CI and production must share the major version.
+- Options: A) Move everything to 18. B) Also install 16 locally on another port.
+- Decision: **A.** Local 18.6, CI `postgres:18`, production Neon 18. Before creating the production database, confirm Neon offers 18; if not, use 17 in both production and CI (one-line change + test).
+- Why: nothing we use differs between 16 and 18 (constraints, advisory locks, `FOR UPDATE SKIP LOCKED`, `timestamptz`, `numeric`); one version everywhere; longest support window.
+- Affects: `.github/workflows/ci.yml`, `tests/test_ci.py`, PRD §8.1, INSTRUCTION.md §5, D-003.
+
+### D-009 Synchronous database driver, proven on Linux, Windows and macOS
+- Date: 2026-09-23
+- Status: **accepted** (owner, 2026-09-23): "fix D-009 for Linux, Windows, Mac, Android"
+- Context: psycopg's async mode doesn't work with Windows' default event loop (Proactor). Async code would pass on the Linux server and CI but break on the owner's Windows machine, or need special loop settings everywhere.
+- Options: A) Async psycopg + force the selector event loop on Windows. B) Plain (sync) psycopg + `psycopg_pool.ConnectionPool`; FastAPI runs `def` endpoints in its thread pool.
+- Decision (built this way in P1.1): **B.**
+- Why: the same code behaves the same on Windows and Linux; simpler code and tests; our load (a few messages per second per tenant) is far below the thread pool's limits. Revisit only if measured load needs it.
+- Affects: `app/db.py`, `app/main.py`, every later portion that touches the database (endpoints are `def`, not `async def`).
+- **Cross-platform (owner request):** the server code must work the same on Linux (production), Windows and macOS (development). Proven by CI running the full gate on `ubuntu-latest`, `windows-latest` and `macos-latest`, each with PostgreSQL 18 and the same limited `chatbot_test` login (C-009). `psycopg[binary]` ships ready-made builds for all three, including Apple Silicon Macs.
+- **Android / iPhone:** these are where students chat (Messenger, WhatsApp, Telegram, the website widget in the phone browser), not where the server runs, so D-009 doesn't affect them. What must work on phones is the widget: real Android Chrome and iPhone Safari checks are required in P5.2.
+
+### D-010 Tenant isolation enforced by the database
+- Date: 2026-09-23
+- Status: **proposed**, needs owner confirmation
+- Context: PRD §10 gives tables a `tenant_id`, but plain foreign keys would still let the database store, for example, client A's contact on client B's channel if app code had a bug. Tenant mix-ups are the worst kind of bug for a multi-client product (one consultancy seeing another's students).
+- Options: A) Plain foreign keys; rely on app code (P6.1 cross-tenant tests) only. B) Composite foreign keys `(tenant_id, parent_id)` → `UNIQUE (tenant_id, id)` on parents, plus `tenant_id` on `messages`, `notes`, `event_registrations`.
+- Decision (built this way in P1.2): **B**, as a second line of defence under the app-level checks.
+- Also in the schema: no foreign key cascades or nulls anything (deleting a client with data is refused); minors (`adult = false`) can't have a phone stored; knowledge can't be published unless its evals passed; one web channel per client; no double booking of the same slot by the same student; a global audit event can't reference a conversation (a composite FK is skipped when a column is NULL).
+- Why: invalid data becomes impossible, not just unlikely. Cost: one extra column on three tables and slightly longer FK definitions.
+- Affects: `migrations/001_init.sql`, PRD §10 (as-built note added), every later portion that inserts rows (must pass `tenant_id`).
 
 ---
 
@@ -157,7 +195,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - G9: this entry
 - `# pragma: no cover` uses: none
 - Bugs found during the portion: none in our code. Gate G5 was defined wrongly (fixed above).
-- Owner sign-off: pending
+- Owner sign-off: yes (2026-09-23), given by asking to proceed to P0.2
 
 ### C-004 Expand .gitignore before the owner's first push
 - Date: 2026-09-23
@@ -170,6 +208,141 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - Tests: unchanged (no code touched).
 - Owner sign-off: pending
 
+### C-005 Portion P0.2: Continuous integration
+- Date: 2026-09-23
+- Type: portion
+- New files:
+  - `.github/workflows/ci.yml`: on every push (all branches) and pull request: Python 3.13, Postgres 16 service with health check, `TEST_DATABASE_URL` ready for P1.1, then ruff check, ruff format check, pytest, coverage 100% (lines + branches), reverse-order run. Read-only permissions, 15-minute timeout, superseded runs cancelled, no secrets.
+  - `tests/test_ci.py`: 10 tests on the workflow file: triggers, Python version = `pyproject.toml`, Postgres 16 + health check, every gate command present, coverage fail-under 100, no `continue-on-error` / `|| true`, no `secrets.`, least privilege + timeout, warnings-as-errors config with no command-line `-W`, branch coverage on.
+- Changed files:
+  - `pyproject.toml`: `pyyaml==6.0.3` added to `[dev]` (D-007) · depends: `tests/test_ci.py`.
+- Deleted files: none
+- Decisions referenced: D-002, D-003, D-007 (proposed)
+- Action versions: `actions/checkout@v7`, `actions/setup-python@v7` (latest releases checked on GitHub, 2026-09-23).
+- Gate result:
+  - G1: `68 passed`
+  - G2/G3: TOTAL 100% lines + branches (`app/` unchanged: 72 stmts, 18 branches)
+  - G4: ruff check: All checks passed; format: 13 files already formatted
+  - G5: config-enforced; no command-line `-W` in CI (tested)
+  - G6: reverse order: 68 passed
+  - G7: 68 passed ×3
+  - Local replay of every `run:` step from `ci.yml` (Git Bash, venv Python): 5/5 PASS
+  - Failure proof: temporary failing test → pytest exit 1; temporary uncovered code → coverage report exit 2; temporary unused import → ruff exit 1. All temporary files removed; suite back to 68 passed.
+  - G8 (manual, owner): after the first push, open the repo's **Actions** tab and see a green run. Then push a branch with a deliberately failing test → red; delete the branch.
+  - G9: this entry
+- Harness note: the first local replay failed because Python's `subprocess` resolved `bash` to the Windows WSL launcher (no Linux installed), not Git Bash. That was a test-harness problem, not a workflow bug; replayed directly in Git Bash instead.
+- `# pragma: no cover` uses: none
+- Owner sign-off: pending (after the G8 check on GitHub)
+
+### C-006 Switch PostgreSQL 16 → 18 (D-008)
+- Date: 2026-09-23
+- Type: refactor
+- New files: none
+- Changed files:
+  - `tests/test_ci.py`: expects `postgres:18`; test renamed `test_postgres_18_service_with_health_check` · changed **first**, confirmed failing (1 failed, 9 passed) before the workflow change.
+  - `.github/workflows/ci.yml`: service image `postgres:16` → `postgres:18` · depends: `tests/test_ci.py`.
+  - `PRD.md` §8.1: DB row says PostgreSQL 18 + Neon availability check.
+  - `INSTRUCTION.md` §5 table + §5.1: PostgreSQL 18 installed; PATH `...\PostgreSQL\18\bin`; steps 4–5 still to do.
+  - `DECISION.md`: D-003 amended; D-008 added.
+- Deleted files: none
+- History note: C-005 still says "Postgres 16"; that is what was true when it was written and is left unchanged.
+- Gate result: G1 68 passed · G2/G3 100% lines + branches · G4 clean (13 files formatted) · G6 68 passed · G7 68 passed ×3 · no remaining `16` references outside history.
+- Local check: `psql (PostgreSQL) 18.6` at `C:\Program Files\PostgreSQL\18\bin`.
+- Owner sign-off: pending
+
+### C-007 Local PostgreSQL set up (owner + Claude)
+- Date: 2026-09-23
+- Type: docs (environment)
+- What happened: the owner had forgotten the `postgres` admin password. Reset by temporarily setting the two `host all all` lines in `pg_hba.conf` to `trust`, restarting the service, setting passwords, and creating role `chatbot_test` (LOGIN, CREATEDB). The owner then set both lines back to `scram-sha-256` and restarted.
+- Verified: `pg_hba.conf` lines 115/117 = `scram-sha-256`; right password → connected as `chatbot_test` on PostgreSQL 18.6; wrong password → `password authentication failed`; no password → refused; role can CREATE and DROP a database.
+- Files: `.env` (local, git-ignored): `TEST_DATABASE_URL` added. Its password is a test-only local password; never reuse it for anything real.
+- Owner sign-off: n/a
+
+### C-008 Portion P1.1: Database connection and migration runner
+- Date: 2026-09-23
+- Type: portion
+- New files:
+  - `app/db.py`: `wait_for_db` (retries with doubling pauses 0.5→8 s, 6 tries, 5 s per-attempt timeout, error without password or extra lines); `migrate` (checks every file before touching the DB: names `NNN_lowercase.sql`, numbers 000.. without gaps/duplicates, UTF-8, not empty/comment-only; CRLF normalized before the SHA-256 checksum; advisory lock so only one instance migrates; one transaction per file incl. its `schema_version` row; refuses edited, renamed or deleted applied files; returns names applied); `open_pool` (sync pool, borrow timeout).
+  - `migrations/000_schema_version.sql`: the `schema_version` table.
+  - `tests/test_db.py`: 36 tests: apply in order, rerun is a no-op, later additions, real directory, `%` in SQL, failure rolls back only the failing file, fix-then-retry, bad 000, edited/renamed/deleted applied files, CRLF vs LF, 11 bad-file cases refused before any DB access, non-UTF-8, non-SQL files and `.sql` folders ignored, **two instances at once apply exactly once**, lock released after failure, wait succeeds/retries/gives up with exact backoff, password never in errors, empty error message, URL without password, real closed port bounded, pool works, **exhausted pool times out cleanly and recovers**.
+  - `tests/test_fixtures.py`: 12 tests for the test-database helpers (retry through the autovacuum race for both error types, give up after the deadline, other errors not retried, missing DB fine, cleanup pattern only matches fixture-made names).
+- Changed files:
+  - `app/main.py`: lifespan: wait for DB → migrate → open pool on startup; close pool on shutdown · depends: every test using `client`/`create_app` now needs a database.
+  - `tests/conftest.py`: `TEST_DATABASE_URL` from env or `.env`; `db_url` fixture creates/drops a throwaway database per test; `_drop_database` retries through the autovacuum race (O-003); session-start cleanup of leftover `t_<12 hex>` databases; `env_vars` now points at the throwaway DB.
+  - `tests/test_health.py`: +2 tests: startup migrates and opens the pool, shutdown closes it; startup fails when the DB is unreachable.
+  - `.env.example`: `TEST_DATABASE_URL` documented.
+  - `README.md`: database requirement + automatic migrations.
+  - `INSTRUCTION.md` §2: new rules "save full output" and "a single unexplained failure blocks the gate"; §5 prerequisite row marked done.
+- Deleted files: none
+- Decisions referenced: D-003, D-008, D-009 (proposed)
+- Bugs found during the portion:
+  1. **Intermittent test error (1 run in ~40)**. Root cause from the PostgreSQL server log: `DROP DATABASE ... WITH (FORCE)` → `permission denied to terminate process`. An autovacuum worker (superuser) had connected to the fresh test database at teardown; our non-superuser test role can't end it. Left one database behind (`t_28df69728aa2`). Fix: bounded retry on exactly `InsufficientPrivilege`/`ObjectInUse` + leftover cleanup + tests. Test-infrastructure bug, not app code. See O-003.
+  2. Gate process: the erroring run's traceback was lost because output was piped to `tail`. Fixed in INSTRUCTION.md §2.
+  3. Closed-port test took 10 s on Windows (refused connections wait for the full timeout), close to its own limit → flake risk. Reduced to one attempt with bound `CONNECT_TIMEOUT + 3`.
+- Gate result (full logs saved for every run):
+  - G1: `118 passed`
+  - G2/G3: `app\db.py 93 stmts, 26 branches, 100%`; TOTAL 175 stmts, 44 branches, **100%**
+  - G4: ruff check: All checks passed; format: 16 files already formatted
+  - G5: config-enforced; no new ignores
+  - G6: reverse order: 118 passed
+  - G7: 5 consecutive runs: 118 passed each; plus 21 clean runs during the investigation; no errors in any saved log
+  - Mutation check on `db.py`: **10/10 deliberate bugs caught** (no advisory lock, no per-file transaction, checksum ignored, CRLF not normalized, gaps allowed, password leak, no backoff, missing files ignored, comment-only allowed, renames allowed); restored, 118 passed
+  - G8: two real servers started at the same moment on one empty database: both `/healthz` → `{"status":"ok"}`; `schema_version` has `000_schema_version.sql` **once**; no errors in either server log; database dropped afterwards
+  - G9: this entry
+- `# pragma: no cover` uses: none
+- Owner sign-off: **yes (2026-09-23)**, after C-009
+
+### C-009 D-009 cross-platform: CI on Linux, Windows and macOS
+- Date: 2026-09-23
+- Type: refactor (CI)
+- New files: none
+- Changed files:
+  - `tests/test_ci.py`: changed **first** (4 new requirements failed against the old workflow): runs on all three OSes with `fail-fast: false`; bash on every OS; PostgreSQL 18 via a third-party action **pinned to commit** `c4dda34a…` (v8); no Linux-only service container; tests use a limited `chatbot_test` login created with `NOSUPERUSER`; every non-`actions/` action pinned to a 40-character commit. Now 14 tests.
+  - `.github/workflows/ci.yml`: matrix `ubuntu-latest`, `windows-latest`, `macos-latest`; `ikalnytskyi/action-setup-postgres@c4dda34aae1c821e3a771b68b73b13af3198a7ee` with PostgreSQL 18; step creating `chatbot_test LOGIN CREATEDB NOSUPERUSER` (the action's own user is a superuser, which tests must not rely on, O-004); `shell: bash` default; timeout 20 min.
+  - `INSTRUCTION.md` P5.2: real-device checks on Android Chrome and iPhone Safari plus desktop browsers.
+  - `DECISION.md`: D-009 accepted and expanded; D-007 accepted; C-008 signed off.
+- Deleted files: none
+- Verified locally: the exact `CREATE ROLE` line from `ci.yml` reaches PostgreSQL's permission check (so the SQL parses); refused only because the local test role can't create roles.
+- Gate result (full logs saved): G1 122 passed · G2/G3 100% (175 stmts, 44 branches) · G4 clean after fixing one line-too-long in `tests/test_ci.py` that the gate caught · G6 122 passed · G7 122 passed ×3 · no errors in any log.
+- **Not yet proven:** the Windows and macOS runs happen on GitHub after the owner's next push. Owner check (G8): Actions tab shows **3 green jobs** (ubuntu, windows, macos).
+- Owner sign-off: pending (after the 3 green jobs)
+
+### C-010 Portion P1.2: Core schema
+- Date: 2026-09-23
+- Type: portion
+- New files:
+  - `migrations/001_init.sql`: 17 tables from PRD §10 (tenants, knowledge_versions, branches, schedules, holidays, events, channels, users, contacts, conversations, messages, bookings, event_registrations, notes, jobs, audit_events, wa_billable) + `set_updated_at` trigger on contacts. **66 check constraints, 21 foreign keys, 12 unique constraints** plus partial/expression unique indexes (one web channel per tenant, case-insensitive email, case-insensitive branch name per tenant, no double booking). Tenant isolation by composite keys (D-010). All timestamps `timestamptz`, money `numeric(10,6)`, no floats, no cascades.
+  - `tests/test_schema.py`: 115 tests: shape (all tables, timestamptz only, `created_at` defaults, no floats, exact cost type, tenant index on every tenant table, job-queue index, **every FK is NO ACTION**); 22 invalid tenant values; defaults; knowledge publish gate; schedules incl. boundaries 10/240 min and weekday 1-7; holidays; events; channels (types, external id rule, uniqueness per type, one web per tenant); users (case-insensitive email, role/tenant rule, email format); contacts (uniqueness, phone E.164, **minor can't store a phone**, score/status, JSON shapes, assignee same tenant, `updated_at` trigger); conversations; messages (role, NULL external ids repeat, non-NULL unique per conversation, non-negative tokens/cost, 6-decimal cost); bookings (status, no double booking, rebook after cancel, reminder state); event registrations; notes; jobs; audit events; WhatsApp billing rows; deleting a tenant with data refused, empty tenant allowed; **cross-tenant links refused on every relationship**.
+- Changed files:
+  - `tests/conftest.py`: `migrated_db_url` = instant copy of a session-wide migrated template (was: migrate per test, ~1 s each); `_run_retrying` shared by drop and clone (autovacuum race on the template → `ObjectInUse`); **session lock** so only the one active test run may delete leftovers, and `OWN_DATABASES` so a run never deletes its own databases; helpers `_new_database_name`, `_create_database`, `_leftovers`, `_url_for`.
+  - `tests/test_fixtures.py`: +7 tests (clone retries, copy has every migration, copy changes don't reach the template, second run can't take the lock, lock exclusive and released on close, leftovers exclude own databases, every fixture database registered). Now 19.
+  - `app/db.py`: **bug fix**: `open_pool` gets its own `open_timeout` (default `POOL_OPEN_TIMEOUT` = 10 s) instead of reusing the borrow timeout; pool connections get `connect_timeout=5`.
+  - `tests/test_db.py`: +3 regression tests (short borrow timeout doesn't limit opening, with a deliberately slow connect; pool open against a dead port fails within `open_timeout + CONNECT_TIMEOUT + 3`; pool connections carry `connect_timeout`); the real-migrations test expects `001_init.sql`. Now 39.
+  - `tests/test_health.py`: startup test expects both migrations.
+  - `PRD.md` §10: as-built note (extra `tenant_id` columns, composite keys, no cascades).
+  - `INSTRUCTION.md` §2: rule "deliberate-bug checks must be crash-safe" (backup outside the project, restore in `finally`, byte-identical check).
+- Deleted files: none
+- Decisions referenced: D-008, D-009, D-010 (proposed)
+- Bugs found during the portion (each: failing test first, then fix):
+  1. **App bug, `open_pool`:** one timeout served two purposes, so a short borrow timeout also limited the pool's first connection. Seen as 1 failure in G7 (`PoolTimeout: pool initialization incomplete after 0.3 sec`). Reproduced deterministically with a slowed connect; fixed with a separate `open_timeout`.
+  2. **App gap, pool connections had no per-connection timeout:** found while bounding the new dead-database test (5.6 s). Fixed: `connect_timeout=5`. The new test fails without the fix, passes with it.
+  3. **Test gap, cascades:** the mutation check added `ON DELETE CASCADE` to branches and no test failed, because other tables still blocked the tenant delete. Fixed with a catalog test requiring every FK to be NO ACTION; it now catches both CASCADE and SET NULL.
+  4. **Test-infra risk, concurrent runs:** leftover cleanup would delete another active run's databases. Fixed with the session lock + own-database set; proven by two full runs started 3 s apart (153 passed each).
+  5. **My edit mistakes, caught by the gate:** a parametrize decorator left on a helper instead of its test (1 error); import order (lint). Both fixed.
+  6. **Process:** the previous session ended mid-mutation-check and left `001_init.sql` missing its no-double-booking index. Detected by an integrity check at the start of this session, restored, verified (114 schema tests passed), and the crash-safe mutation rule added.
+- Gate result (full logs saved):
+  - G1: `247 passed`
+  - G2/G3: `app/db.py` 94 stmts, 26 branches, 100%; TOTAL 176 stmts, 44 branches, **100%**
+  - G4: ruff check: All checks passed; format: 17 files already formatted
+  - G5: config-enforced; no new ignores
+  - G6: reverse order: 247 passed
+  - G7: 247 passed ×3; no errors or failures in any saved log; `001_init.sql` unchanged during the gate (SHA-256 OK); 0 leftover test databases
+  - Mutation checks on `001_init.sql` (crash-safe, restored byte-identical): **10/10 caught** after adding the FK catalog test (minor phone rule, publish gate, contact and message tenant binding, case-insensitive email, double booking, global audit rule, operator/tenant rule, float cost, cascade; plus SET NULL)
+  - G8: real migrated database, every table's columns listed and compared with PRD §10: all present; differences are the deliberate D-010 additions (recorded in PRD §10)
+  - G9: this entry
+- `# pragma: no cover` uses: none
+- Owner sign-off: pending
+
 ### Existing files at the start of the log
 - `PRD.md` (v2.1): product requirements. Source of truth for *what* to build.
 - `BUILD_PROMPT.md`: session prompt for Claude Code.
@@ -179,3 +352,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
 ## Open items
 - **O-001** Remove the `anyio.abc.BlockingPortal` warning ignore in `pyproject.toml` when a Starlette release stops using the deprecated alias (check at each dependency update).
 - **O-002** Git and GitHub are handled by the owner (2026-09-23): the owner runs `git init`, commits and pushes to a private repo. Claude doesn't run git commands on this project unless asked. Before each push, the owner checks that `.env` and `.venv/` aren't staged.
+- **O-003** (resolved 2026-09-23) Intermittent "1 error" in the test suite. Root cause: autovacuum race on `DROP DATABASE WITH (FORCE)` in the test fixture (C-008). Fixed with bounded retry + tests. **If any unexplained error appears again, P1.1 re-opens.**
+- **O-005** Tenant `timezone` is only checked for non-empty in the database (a CHECK can't look up the timezone list). Validate it against `zoneinfo.available_timezones()` in the operator console when a tenant is created or edited (P6.3).
+- **O-006** Gate time grew to ~2.5 min per full run (247 tests, most creating a database). If it passes ~5 min, consider running tests in parallel (would need a new dev dependency, so a decision).
+- **O-004** The test role `chatbot_test` isn't a superuser (good), so tests can't use superuser-only features. If a later portion needs one (e.g. an extension), grant it explicitly and log a decision; never make the test role a superuser.

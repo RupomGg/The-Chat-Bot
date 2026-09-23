@@ -282,7 +282,7 @@ Why a Postgres job table and not Redis/Celery: durable (no lost messages on depl
 | Language/runtime | Python 3.13 (D-002) |
 | Web | FastAPI + Uvicorn |
 | LLM | `anthropic` Python SDK (default: Claude Haiku 4.5) + `google-genai` SDK (challenger: Gemini Flash). One function per provider in `llm.py`, same inputs/outputs |
-| DB | PostgreSQL 16 on **Neon** (AWS Singapore), Launch plan, PITR 7 days |
+| DB | PostgreSQL 18 (D-008) on **Neon** (AWS Singapore), Launch plan, PITR 7 days. Confirm Neon offers 18 at project creation; if not, use 17 in production and CI |
 | DB access | `psycopg` 3 async pool + plain SQL; numbered SQL migrations |
 | Queue/scheduler | Postgres `jobs` table + worker loop |
 | HTTP out | `httpx` |
@@ -394,6 +394,8 @@ wa_billable(tenant_id, month, category, count)
 ```
 
 Indexes on every `tenant_id` + time column used in lists; `jobs(status, run_at)`. Reports are SQL views.
+
+**As built (P1.2, `migrations/001_init.sql`):** `messages`, `notes` and `event_registrations` also carry `tenant_id`, and every child table references its parent through a composite key `(tenant_id, parent_id)`, so the database refuses rows that mix two clients' data (D-010). `branches`, `schedules` and `events` also have `created_at`. No foreign key cascades or nulls anything on delete: deleting a client with data is refused.
 
 ## 11. API surface
 

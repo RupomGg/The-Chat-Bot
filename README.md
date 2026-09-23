@@ -8,8 +8,11 @@ What to build: `PRD.md` · Build order and quality gate: `INSTRUCTION.md` · Cha
 ```bash
 python -m venv .venv
 .venv/Scripts/python -m pip install -e ".[dev]"
-cp .env.example .env    # then fill in FERNET_KEY and SESSION_SECRET (commands inside)
+cp .env.example .env    # then fill in FERNET_KEY, SESSION_SECRET, TEST_DATABASE_URL
 ```
+
+Tests need PostgreSQL 18 and a login that can create databases (INSTRUCTION.md §5.1).
+The app applies `migrations/*.sql` automatically at startup.
 
 ## Run
 
