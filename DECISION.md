@@ -778,7 +778,70 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - G8 manual check: demo company (Banani 10-13 ×2 seats, Online 15-19 ×1, Friday closed, a holiday): Thursday 17:01 → only today's 18:00 left, Friday and the holiday absent, 29 slots in 7 days; booking hides the slot, retry gives the same id, cancel brings it back.
 - Note: full test run is now ~3 min (DB-heavy booking tests); still well under the 5-minute limit.
 - `# pragma: no cover` uses: none
+- Owner sign-off: **signed off** 2026-09-24 ("g")
+
+### C-025 Portion P2.5: Sensitive-data redaction
+- Date: 2026-09-24
+- Type: portion
+- New files:
+  - `app/redact.py`: `redact(text)` replaces card numbers (13-19 digits passing the Luhn check, written in one piece or grouped like a card: 4-4-4-4 or 4-6-5), NIDs (10/13/17 digits; with spaces only when every piece has 3+ digits) and passport-like numbers (1-2 letters + 7-8 digits, standing alone, any case) with `[card]`, `[nid]`, `[passport]`. Digits of any script count (Bangla included). Valid Bangladesh phone numbers are always kept (D-014), including a 13-digit `880...` phone that looks like an old NID, and phones next to other numbers. Money, dates, times, scores untouched. Redacting twice changes nothing more. No backslashes in the file (patterns use `[0-9]`), per the new backslash rule.
+  - `tests/test_redact.py`: 75 cases: 10 card forms (incl. Amex grouping, 13 and 19 digits, Bangla digits), non-Luhn/too-short/too-long kept, card next to another number, numbers that happen to pass the card check but aren't written like a card (two money amounts side by side) kept; 6 NID forms, other lengths kept, "2026 2027 20" kept; 5 passport forms, 7 look-alikes kept; 7 phone forms kept, phones next to other numbers kept (incl. 17 and 13 digits together); 7 money forms and 6 ordinary messages unchanged; several items at once; passport followed by a number redacted once; 2 hypothesis properties (never raises + idempotent; a random Bangladesh phone anywhere in random text survives).
+- Changed files: none
+- Deleted files: none
+- Decisions made here: the phone rule wins over the NID rule (a valid phone is never redacted); passports accept 7-8 digits and lower-case letters (the spec said 7; 8-digit e-passports exist); a 10-digit plain number (e.g. 100 crore written without commas) is treated as an NID; privacy first.
+- Decisions referenced: D-014
+- Bugs found:
+  1. **Found while planning tests (mine):** a number and a phone separated by a space could join into an NID-length number and hide the phone. Fixed: runs containing a phone are checked piece by piece.
+  2. **Mutation check found 5 test gaps:** my "odd grouping" test had 17 digits, not 16, so it never tested its claim; no test for money pairs that happen to pass the card check; none for a 17-digit phone+number; none for a 13-digit phone next to a number; none for a passport followed by a number (double redaction). All added. One redundant phone check in the card rule removed (a phone can't be written in card grouping).
+- Gate result (full logs saved):
+  - G4: ruff check exit 0; format exit 0 (41 files); invisible-character scan: clean
+  - G1: 1270 passed
+  - G2/G3: `app/redact.py` 62 stmts / 26 branches 100%; TOTAL 1187 / 488 **100%**
+  - G6: reverse order: 1270 passed
+  - G7: 1270 passed ×3 (2:44, 2:28, 2:34); no problems in logs; no file changed; 0 leftover databases
+  - Mutation check (crash-safe, restored byte-identical): **16/16 caught**, plus 1 control mutation (no effect) correctly reported as missed, proving the harness can tell the difference
+  - G8: none (pure function)
+- `# pragma: no cover` uses: none
+- Owner sign-off: **signed off** 2026-09-24 ("g")
+
+### C-026 Portion P2.6: Abuse guards (Level 2 complete)
+- Date: 2026-09-24
+- Type: portion (D-018, D-019)
+- New files:
+  - `app/guard.py`: `check_input(text)` (before any AI call, free): pasted code (a code fence; 3+ code-looking lines: indented bodies, code starts like `def`/`import`/`#include`/`for(`, SQL clauses, lines ending in braces, or `;` lines with `( = [`; a one-liner with braces and 2+ semicolons, or a code start with a semicolon) → "code"; a base64/hex run of 200+ characters → "encoded"; jailbreak phrases in English, Banglish and Bangla, matched as whole words after folding (capitals, full-width letters, zero-width characters, line breaks, punctuation and spelled-out letters "I G N O R E" can't hide them) → "jailbreak". `check_reply(text, max_chars=2000)`: code → "code", over the channel limit → "too_long". No backslashes in the file.
+  - `tests/test_guard.py`: 180 cases: 52 real English/Banglish and 40 real Bangla messages pass (incl. "act as a sponsor", "tell me the rules for dependants", "new instructions for UK visa", "pretend to be employed", "contact as a developer", "dev modern", "I-20 sponsor", form lines ending in ";", "Tuition = 12 lakh" lists, "For UK:" headings); 31 jailbreaks blocked; 3 phrases × 6 disguises; 10 code forms blocked, 2 lines not enough; encoded blob boundary; good replies (incl. price lists, headings, indented bullets) sent, code replies stopped, length limit; hypothesis: never raises.
+- Changed files: `app/quick_answers.py`: the text folding moved into `fold_text` (shared with the guard) and now drops every invisible format character (zero-width spaces, word joiners), not only the two Bangla joiners; `normalize_trigger` uses it (all 131 quick-answer tests still pass).
+- Deleted files: none
+- Decisions referenced: D-018, D-019
+- Bugs found (all mine, all fixed before sign-off):
+  1. **Over-blocking found while writing the real-message list:** "tell me the rules", "new instructions", "pretend to be", "Name: Rahim;" form lines would have been blocked. Patterns narrowed.
+  2. **Code detection missed Python and SQL** (only 2 of 5 lines counted); added indentation and SQL clauses. Then noticed that assignment/heading rules would block normal AI replies ("Total = £21,000", "For UK:"); dropped them, indentation carries Python.
+  3. **The manual check caught 3 abuse attempts the tests missed:** "act as a senior python developer" (two words), "I G N O R E your rules" (spelled out), "for(int i=0;...){...}" (one brace pair). Fixed and added as tests.
+  4. **Mutation check found 7 test gaps** over two rounds: phrase matching inside words ("contact as a developer", "dev modern"), exactly-3-line code, brace one-liner without a code start, braces with one semicolon, "I-20" read as "ai", three words before "developer". All added.
+  5. An auto-formatted multi-line rule was only half-removed by my line filter (syntax error, caught by lint); fixed directly.
+- Gate result (full logs saved):
+  - G4: ruff check exit 0; format exit 0 (43 files); invisible-character scan: clean
+  - G1: 1450 passed
+  - G2/G3: `app/guard.py` 62 stmts / 26 branches 100%, `app/quick_answers.py` 176 / 78 100%; TOTAL 1250 / 514 **100%**
+  - G6: reverse order: 1450 passed
+  - G7: 1450 passed ×3 (2:21, 2:43, 2:44); no problems in logs; no file changed; 0 leftover databases
+  - Mutation check (crash-safe, restored byte-identical): **25/25 caught**
+  - G8 manual check: 20 real questions (English, Banglish, Bangla, phones, links, prices): 0 blocked; 20 abuse attempts (jailbreaks, disguised, Banglish/Bangla, Python/SQL/C, base64): 0 let through.
+- Honest limit: phrase lists can't catch every rewording (e.g. homoglyph letters from other alphabets); the AI's core rules (D-018), the reply check and the eval set (P7.1) are the next layers.
+- `# pragma: no cover` uses: none
 - Owner sign-off: pending
+
+### C-027 Fix: CI #5 failed on Linux and macOS (Cherokee letters in quick-answer triggers)
+- Date: 2026-09-25
+- Type: bug fix (found by CI, not locally)
+- What failed: `test_normalized_triggers_satisfy_the_database_rule` on ubuntu and macos (1 failed, 1194 passed); Windows passed. Hypothesis input: the Cherokee letter A (U+13A0).
+- Cause: Unicode's `casefold()` maps lower-case Cherokee **to upper-case** (a stability rule unique to Cherokee: all 172 affected characters are Cherokee, checked over every code point). The trigger was saved upper-case; PostgreSQL on Linux/macOS lower-cases Cherokee, so the database's "triggers are lower-case" rule rejected it. PostgreSQL on Windows doesn't lower-case Cherokee, so it passed locally.
+- Fix: `fold_text` applies `lower()` after `casefold()` (`app/quick_answers.py`, one line). Checked over all of Unicode that casefold-then-lower gives stable output (0 exceptions).
+- Tests: `tests/test_quick_answers.py`: the stability property now also asserts the result is lower-case (so this is caught on every OS, not only by a Linux database); new test for 3 Cherokee inputs. With the fix removed, 3 tests fail on Windows.
+- Gate: G4 exit 0 (43 files), invisible-character scan clean; G1 1453 passed; G2/G3 TOTAL 1250 / 514 **100%**; G6 1453 passed; G7 1453 ×3; no problems in logs; no file changed; 0 leftover databases.
+- Lesson → new rule in INSTRUCTION.md: a portion isn't finished until CI is green on all three OSes after the owner pushes (the databases on Linux/macOS behave differently from Windows).
+- `# pragma: no cover` uses: none
+- Owner sign-off: pending (after CI is green)
 
 ### Existing files at the start of the log
 - `PRD.md` (v2.1): product requirements. Source of truth for *what* to build.

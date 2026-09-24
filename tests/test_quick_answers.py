@@ -139,6 +139,15 @@ def test_normalize_trigger_never_raises_and_is_stable(text):
         assert result == result.strip()
         assert "  " not in result
         assert 1 <= len(result) <= MAX_TRIGGER
+        assert result == result.lower()  # the database's rule, checked on every OS
+
+
+@pytest.mark.parametrize("upper", [chr(0x13A0), chr(0x13F5), chr(0x13A0) + chr(0x13A1)])
+def test_cherokee_ends_up_lower_case(upper):
+    # casefold() maps Cherokee to UPPER case; Linux/macOS databases then rejected it (CI #5).
+    result = normalize_trigger(upper)
+    assert result == upper.lower() != upper
+    assert normalize_trigger(result) == result
 
 
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])  # read-only use

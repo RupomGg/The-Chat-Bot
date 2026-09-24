@@ -17,7 +17,6 @@ MAX_TRIGGER = 100
 MAX_TRIGGERS = 50
 MAX_ANSWER = 2000  # Messenger's text limit, the smallest of our channels
 MAX_BUTTONS = 3  # WhatsApp reply buttons, the smallest of our channels
-IGNORED = frozenset("\u200c\u200d")  # Bangla joiners: typed inconsistently, so ignored
 TENANT_LOCK = 733  # the same per-tenant lock the database's trigger rule takes
 
 
@@ -38,20 +37,34 @@ class QuickAnswer:
 # ---------- matching ----------
 
 
+def fold_text(text: str) -> str:
+    """Text reduced to what a reader sees: lower-case, full-width letters made normal,
+    letters/marks/digits of any script kept, punctuation and emoji become one space,
+    invisible format characters (zero-width spaces, joiners) dropped. Shared with the
+    abuse guard (P2.6), so hidden characters can't split a word there either."""
+    # casefold() turns lower-case Cherokee into upper-case (a Unicode rule), and databases on
+    # Linux/macOS then see an upper-case letter; lower() afterwards fixes the only such script.
+    text = unicodedata.normalize("NFKC", unicodedata.normalize("NFKC", text).casefold().lower())
+    kept = "".join(
+        ""
+        if unicodedata.category(ch) == "Cf"
+        else ch
+        if unicodedata.category(ch)[0] in "LMN"
+        else " "
+        for ch in text
+    )
+    return unicodedata.normalize("NFKC", " ".join(kept.split()))
+
+
 def normalize_trigger(text) -> str | None:
     """The one normalization for saved triggers and for student text, so they always agree.
 
     'Fees??' → 'fees'; 'Office  kothay?' → 'office kothay'; 'ঠিকানা।' → 'ঠিকানা'.
-    Lower-case, letters/marks/digits of any script kept, punctuation and emoji become spaces,
-    spaces collapsed. None when nothing is left or it's longer than any trigger can be.
+    None when nothing is left or it's longer than any trigger can be.
     """
     if not isinstance(text, str) or len(text) > 10 * MAX_TRIGGER:
         return None
-    text = unicodedata.normalize("NFKC", unicodedata.normalize("NFKC", text).casefold())
-    kept = "".join(
-        "" if ch in IGNORED else ch if unicodedata.category(ch)[0] in "LMN" else " " for ch in text
-    )
-    result = unicodedata.normalize("NFKC", " ".join(kept.split()))
+    result = fold_text(text)
     return result if result and len(result) <= MAX_TRIGGER else None
 
 
