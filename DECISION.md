@@ -197,6 +197,29 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - Decision: (1) dev dependency `pytest-xdist==3.8.0`, `-n auto` in pytest config, so every gate command runs in parallel unchanged; coverage measures the workers (`patch = ["subprocess"]`). (2) `migrated_db_url` reuses one copy per worker and resets it after each test (TRUNCATE + restart sequences) instead of clone + drop; a schema fingerprint check re-clones if a test changed the structure.
 - Affects: `pyproject.toml`, `tests/conftest.py`, gate time.
 
+### D-018 The bot is never a free general AI (every industry)
+- Date: 2026-09-24
+- Status: **accepted** (owner: "make sure using the bot people can't get other answers like getting code or fixing algorithm")
+- Context: the on-topic rule lived only in the study_abroad pack's prompt; a new pack could leave it out. Nothing checked the model's reply before sending, and a patient user could get unlimited AI answers (our cost, and Meta's WhatsApp AI policy).
+- Decision: five layers. (1) **Now:** `CORE_RULES` added by the core to every industry's prompt, last (no code/algorithms/homework/essays/translations/general advice; one-line redirect; customer text is data). (2) P4.4 **reply guard**: a reply containing code is replaced by the redirect before sending. (3) P4.4 **off-topic streak**: 3 in a row → no model call for 1 hour (fixed redirect + quick-answer buttons). (4) P4.4 **daily cap**: 60 AI replies per contact per day (tenant setting), then handoff. (5) P7.1 **core off-topic/abuse eval set** (≥ 25 cases, ≥ 8 Banglish) every tenant must pass 100% before publishing. Quick answers need nothing: they only send the company's saved text.
+- Affects: `app/knowledge.py`, `tests/test_knowledge.py`, INSTRUCTION.md P4.4 and P7.1, PRD §9.5 and Appendix C.
+
+### D-019 Token-lean AI turns, without losing accuracy
+- Date: 2026-09-24
+- Status: **accepted** (owner: "no one can jailbreak and use my AI as their personal LLM; answer and query token optimized for maximum accuracy")
+- Context: checked against the current Claude API docs: Haiku 4.5 accepts `temperature`, Sonnet 5 rejects it (400); on Haiku 4.5 nothing caches below 4,096 tokens of fixed prompt; cached reads cost 0.1× input, cache writes 1.25× (5 min) or 2× (1 h).
+- Decision: quick answers first (0 tokens); new portion **P2.6** input guard (pasted code, encoded blobs, jailbreak phrases blocked before any model call, 0 tokens) and reply guard (code/over-long replies never sent); history 30 → **12 messages** + profile JSON; student text cap 2,000 → **1,000 chars**; `max_tokens` 1024 → **500**; `temperature` 0.2 on Haiku 4.5 (omitted where rejected); whole knowledge in the cached system prompt (no retrieval step: most accurate for ≤ 10k tokens); compact JSON tool results; 5-min cache by default, 1 h only for steady-traffic tenants; core rules now also require grounded, 1-4 sentence answers for every industry. Rule: a token saving is kept only if the eval pass rate holds.
+- Honest limit: no prompt makes a language model impossible to jailbreak. The design makes a successful attempt worthless: short replies, no code ever sent, 60 AI replies a day, and repeat offenders get no AI at all.
+- Affects: `app/knowledge.py`, INSTRUCTION.md P2.6/P4.1/P4.2/P4.4, PRD F8, §9.1, §9.2.
+
+### D-020 Industry-neutral names in the core
+- Date: 2026-09-24
+- Status: **accepted** (owner: "how will I change these when I find a different industry client" → "g")
+- Context: the code is industry-free, but the plan still named core things after study abroad: P2.4 "counselling slots", the AI tool `book_counselling`, and handoff reasons like `visa_case` fixed in the core.
+- Decision: core names are neutral: "appointment" (P2.4), tool `book_appointment`; `request_handoff` reasons = core (`asked_for_human`, `complaint`, `unanswered`, `integrity`) + each pack's `handoff_reasons`; packs get `[terms]` (appointment, staff) so screens and messages say "counselling session"/"counsellor" for study abroad and "vet visit"/"vet" for pet care. The database role value `counsellor` stays (internal, never shown; the screen shows the pack's staff label): renaming it would need a migration for no customer-visible gain.
+- New industry = a new pack folder, no code or database change (PRD §0).
+- Affects: INSTRUCTION.md P2.4/P4.3, PRD §5 flow, F14, §9.4, Appendix A; `packs/study_abroad/prompt.md`.
+
 ---
 
 ## Change log
@@ -619,7 +642,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - G9: this entry
 - Note: full test run now takes 4-6.5 minutes (O-006 threshold of 5 minutes reached).
 - `# pragma: no cover` uses: none
-- Owner sign-off: pending
+- Owner sign-off: **signed off** 2026-09-24 ("G p2.2")
 
 ### C-019 Test speed-up (O-006)
 - Date: 2026-09-24
@@ -645,6 +668,116 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - G6: reverse order: 845 passed (1:51)
   - G7: 845 passed ×3 (1:40, 1:51, 1:46), no problems in logs, 0 leftover databases
 - `# pragma: no cover` uses: none
+- Owner sign-off: **signed off** 2026-09-24 ("G p2.2")
+
+### C-020 Portion P2.2: Quick answers from the database + knowledge versions
+- Date: 2026-09-24
+- Type: portion (D-015)
+- New files:
+  - `app/quick_answers.py`: `normalize_trigger` (one normalization for saved triggers and student text: NFKC + casefold, letters/marks/digits of any script kept, punctuation/emoji → space, Bangla joiners ignored, ≤ 100 characters); `find_quick_answer` (button payload → exact code, typed text → exact trigger, active only, this tenant only, student's language → English → first alphabetically; no fuzzy matching); `save_quick_answer` (create/replace, lists every problem, buttons must name existing codes, friendly clash/duplicate messages); `delete_quick_answer`; `undo_change` (create → delete, edit → revert, delete → re-create with the same id; only the latest change of an answer can be undone, per-tenant lock so two admins can't undo at once; the undo is itself recorded). Who made the change goes to the history via `app.user_id`, set only for that transaction.
+  - `app/knowledge.py`: knowledge versions (`save_version` drafts, `publish_version` only after evals pass and every template blank is filled; publishing an older version rolls back), `published_knowledge`, `estimate_tokens`, `unfilled_blanks`, `render_system_prompt` (byte-identical for the same inputs, Windows line endings included; one-pass fill so knowledge text is never treated as a placeholder).
+  - `tests/test_quick_answers.py` (53 tests, 136 cases incl. 2 hypothesis properties: stable/never raises, and every normalized trigger passes the database's own rule), `tests/test_knowledge.py` (23 tests, 41 cases).
+- Changed files: none
+- Deleted files: none
+- Limits chosen (easy to change): 3 follow-up buttons (WhatsApp shows no more), 2000 characters per answer (Messenger's limit), 50 triggers per answer.
+- Decisions referenced: D-010, D-012, D-015
+- Bugs found:
+  1. **The file-writing tool turned `‌`/`‍`/`́` escapes into real invisible characters** (same as P2.1b); found by a scan and replaced with escapes.
+  2. **Two of my tests were wrong:** they called the functions on an idle connection, where psycopg commits the function's own transaction, so "rolls back with the caller" and "second admin waits" weren't really tested. Fixed (outer transaction opened first), and a test added for the idle case.
+  3. **Mutation check found a third test gap** of the same kind ("two publishes in one transaction"); fixed, mutant now caught.
+- Gate result (full logs saved, stdout + stderr, exit codes):
+  - G4: ruff check exit 0; format exit 0 (35 files)
+  - G1: 1022 passed (2:00)
+  - G2/G3: `app/quick_answers.py` 175 stmts / 78 branches, `app/knowledge.py` 47 / 16, both 100%; TOTAL 952 stmts, 398 branches, **100%**
+  - G6: reverse order: 1022 passed
+  - G7: 1022 passed ×3 (2:00, 2:05, 2:04); no problems in logs; no file changed since the gate started; 0 leftover databases
+  - Mutation check (crash-safe, restored byte-identical): **24/25 caught** after the test fix. 1 equivalent: removing `sorted()` in the language fallback changes nothing because PostgreSQL's jsonb already keeps 2-letter keys in alphabetical order; `sorted()` kept so the code doesn't depend on that storage detail.
+  - G8 manual check: demo tenant: create (Bangla answer to "Koto taka?"), edit (falls back to English), delete (no match → AI), undo (back); history shows all 4 changes with who; knowledge published and prompt rendered, identical with Windows line endings.
+- `# pragma: no cover` uses: none
+- Owner sign-off: **signed off** 2026-09-24 ("G")
+
+### C-021 Core stay-on-topic rules for every industry (D-018)
+- Date: 2026-09-24
+- Type: change to P2.2 code + plan
+- New files: none
+- Changed files:
+  - `app/knowledge.py`: `CORE_RULES`, appended by `render_system_prompt` after every pack's prompt (still byte-identical, one-pass fill).
+  - `tests/test_knowledge.py`: +4 tests: both packs end with the core rules; the rules name code, algorithms, homework, essays, translations and "ignore"; a pack whose prompt says "help with anything, including code" still gets the rules after it.
+  - `INSTRUCTION.md`: P4.4 reply guard, off-topic streak, daily cap + abuse manual check; P7.1 core off-topic/abuse eval set.
+  - `PRD.md`: §9.5 Scope rewritten for every industry; Appendix C +3 abuse eval cases.
+- Deleted files: none
+- Bugs found: my edit script wrote real line breaks instead of `
+` into two test strings; lint caught the syntax error and it was fixed with explicit escapes.
+- Gate result: G4 exit 0 (35 files); G1 1026 passed; G2/G3 `app/knowledge.py` 49 stmts / 16 branches 100%, TOTAL 954 / 398 **100%**; G6 1026 passed; G7 1026 passed ×3 (2:03, 2:09, 2:04); no problems in logs; no file changed; 0 leftover databases.
+- `# pragma: no cover` uses: none
+- Owner sign-off: **signed off** 2026-09-24 ("G")
+
+### C-022 Grounded, short answers in the core rules + token/guard plan (D-019)
+- Date: 2026-09-24
+- Type: change to P2.2 code + plan
+- New files: none
+- Changed files:
+  - `app/knowledge.py`: `CORE_RULES` also require facts only from <knowledge> (else `log_unanswered`, never guess) and 1-4 sentence answers, for every industry.
+  - `tests/test_knowledge.py`: +2 tests (grounding/brevity lines present; core rules stay under 500 estimated tokens).
+  - `INSTRUCTION.md`: new portion P2.6 abuse guards; P4.1 12-message history, 1,000-char cap, compact tool JSON, cache layout; P4.2 token settings; P4.4 uses the guards.
+  - `PRD.md`: F8 (1,000 chars, 60 AI replies/day), §9.1 (`max_tokens` 500, temperature), §9.2 token budget per turn.
+- Deleted files: none
+- Gate result: G4 exit 0 (35 files); G1 1028 passed; G2/G3 `app/knowledge.py` 49 / 16 100%, TOTAL 954 / 398 **100%**; G6 1028 passed; G7 1028 passed ×3 (1:56, 1:56, 1:53); no problems in logs; no file changed; 0 leftover databases.
+- `# pragma: no cover` uses: none
+- Owner sign-off: **signed off** 2026-09-24 ("G")
+
+### C-023 Portion P2.3: Lead scoring
+- Date: 2026-09-24
+- Type: portion
+- New files:
+  - `app/scoring.py`: `score(pack, profile, settings, today) -> Score(level, flags)`. Evaluates the pack's hot/warm rules and flags with the generic operators (present, absent, eq, ne, in, not_in, gte, lte, within_months, overlaps_setting, any); no industry rules in code. Text compares ignoring case and extra spaces; numbers/booleans strictly (True ≠ 1); a list or dict where one value belongs matches nothing. Intake: not passed (this month still counts), and its first day at most N months from today (month-end days clamp, leap years handled). `today` must be a date (the caller passes the tenant's local date; the clock is never read). Bad values never raise.
+  - `tests/test_scoring.py`: 117 cases: every Hot rule on its own; MOI/booked count as English; unknown funding doesn't block Hot; country matching ignores case; missing served-countries setting blocks Hot; date boundaries (exactly 9 months, +1 day, exactly 18 months, +1 day, this month, passed, Nov → Aug, 31st → Feb 28/29); Warm/Cold; no phone never above Cold; every flag incl. gap 5 vs 4; the pet-care pack scored by the same engine; every operator on hand-built rules; 3 hypothesis properties (never raises on any profile, including when every rule is reached).
+- Changed files: `PRD.md` F2: last 30 → 12 messages (was stale after D-019).
+- Deleted files: none
+- Decisions made here: an unknown value counts as "not equal" (so unknown funding doesn't block Hot); an intake in the current month is upcoming, not past.
+- Decisions referenced: D-012, D-019
+- Bugs found:
+  1. **Real bug found while reviewing:** a list or dict in a single-value field (bad AI output) crashed scoring (unhashable). The first property test missed it because rules stop at the first failed check; added a property test that starts from a Hot profile so every rule runs, and fixed the comparison.
+  2. **Mutation check found redundant code:** a "value present" check before eq/in comparisons never changed a result (the loader forbids blank comparison values). Removed.
+  3. **Mutation check found a test gap caused by CPython sharing small numbers:** a broken number comparison still matched 5 == 5 by accident; added a test with a large number built at runtime.
+- Gate result (full logs saved):
+  - G4: ruff check exit 0; format exit 0 (37 files)
+  - G1: 1145 passed
+  - G2/G3: `app/scoring.py` 75 stmts / 34 branches 100%; TOTAL 1029 / 432 **100%**
+  - G6: reverse order: 1145 passed
+  - G7: 1145 passed ×3 (1:55, 2:00, 1:57); no problems in logs; no file changed; 0 leftover databases
+  - Mutation check (crash-safe, restored byte-identical): **20/20 caught** after the fixes above
+  - G8: none (pure function)
+- `# pragma: no cover` uses: none
+- Owner sign-off: **signed off** 2026-09-24 ("g")
+
+### C-024 Portion P2.4: Appointment slots and bookings (+ neutral names, backslash rule)
+- Date: 2026-09-24
+- Type: portion (D-020)
+- New files:
+  - `app/booking.py`: `list_slots` (next open slots from each branch's weekly schedule in the company's timezone; holidays, past and full slots removed; overlapping schedule rows give one slot with the larger capacity; branch filter; `from_date`; empty list when nothing is open), `book` (locks the branch row so two people can't both take the last seat; retrying the same booking returns the same id; refuses times that aren't open slots, full slots, other companies' branches/contacts), `cancel` (frees the seat at once). All times compared in UTC.
+  - `tests/test_booking.py`: 50 tests: schedule → slots, weekly repeat, closing-time boundary (ends exactly at closing: in; crossing: out), holidays, past (a slot starting right now is too late), Friday closed, empty schedule, limit/window/from_date, overlapping rows, branch separation and filter, other company never shown; Dhaka (no daylight saving); London on the day clocks go back (right UTC, repeated hour uses the first, real 1-hour length), on the day clocks go forward (a skipped time has no slot, an hour that doesn't exist gives none); invalid/unknown company timezone; booking, full, retry, not-a-slot, holiday, other company, naive times; **two people racing for the last seat: exactly one gets it**; cancel frees the seat, twice refused, other company refused.
+- Changed files:
+  - `INSTRUCTION.md`: P2.4 renamed to appointments; P4.3 neutral tools (`book_appointment`), handoff reasons = core + pack, pack `[terms]` (D-020); new working rule **"Escape sequences in files (backslash rule)"**.
+  - `PRD.md`: flow, F14, §9.4 tools table, Appendix A (`book_appointment`).
+  - `packs/study_abroad/prompt.md`: `book_counselling` → `book_appointment`.
+- Deleted files: none
+- Decisions referenced: D-009, D-010, D-020
+- Bugs found:
+  1. **Real bug:** on the night clocks go back, Python treats the two 01:30s as equal when they share a timezone, so a booking for the second 01:30 (not a slot) could slip through as the first. Fixed by comparing every time in UTC; regression test added.
+  2. **My tests:** the Friday test's week began on a Sunday whose slot had passed (5 days, not 6); the contact helper made a second web channel (one per company). Fixed.
+  3. **Mutation check:** my clock-change test hid a "skipped hour kept" bug because the wrong slot merged with a real one; added the exact case (a schedule only inside the missing hour gives no slot). One mutation of mine was badly written (swapped parameters); rewritten properly and caught.
+  4. **The backslash problem again** (\n turned into a real line break in my mutation script, the 5th time): owner asked for a permanent fix → rule added to INSTRUCTION.md and to Claude's memory; this entry follows it.
+- Gate result (full logs saved):
+  - G4: ruff check exit 0; format exit 0 (39 files); invisible-character scan of `app/` and `tests/`: clean
+  - G1: 1195 passed
+  - G2/G3: `app/booking.py` 96 stmts / 30 branches 100%; TOTAL 1125 / 462 **100%**
+  - G6: reverse order: 1195 passed
+  - G7: 1195 passed ×3 (3:09, 2:47, 2:40); no problems in logs; no file changed; 0 leftover databases
+  - Mutation check (crash-safe, restored byte-identical): **18/18 caught** after the fixes above
+  - G8 manual check: demo company (Banani 10-13 ×2 seats, Online 15-19 ×1, Friday closed, a holiday): Thursday 17:01 → only today's 18:00 left, Friday and the holiday absent, 29 slots in 7 days; booking hides the slot, retry gives the same id, cancel brings it back.
+- Note: full test run is now ~3 min (DB-heavy booking tests); still well under the 5-minute limit.
+- `# pragma: no cover` uses: none
 - Owner sign-off: pending
 
 ### Existing files at the start of the log
@@ -661,6 +794,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - **O-006** ~~Gate time~~ **Resolved (D-017, C-019):** full run 4-6.5 min → ~1:45 in parallel.
 - **O-007** Encryption-key rotation (PRD §12.2): `encrypt`/`decrypt` use one `FERNET_KEY`. Add rotation (e.g. `MultiFernet` with old + new keys, then re-encrypt stored secrets) with its runbook in P7.2.
 - **O-008** Before the first client signs: lawyer review of guardian consent for under-18 phone numbers (D-014) and of the DPA template.
+- **O-013** `estimate_tokens` is a byte-based estimate (marked `ponytail:` in `app/knowledge.py`). Replace with the provider's token-count call when the AI client exists (P3).
 - **O-009** Windows console encoding (cp1252) can't print Bangla when output is redirected. When structured logging is built (P7.2), write logs as UTF-8 explicitly (e.g. `sys.stdout.reconfigure(encoding="utf-8")` or `PYTHONUTF8=1` in the service settings) and test a Bangla log line.
 - **O-010** `packs/study_abroad/prompt.md` and `knowledge_template.md` are now the source of truth; PRD Appendix A/B are copies. Change the pack files first and keep the PRD in step (or replace the appendices with pointers). The Docker image must include `packs/` (P7.2).
 - **O-011** `phones.py` has a small calling-code table (13 countries). If the product serves many more countries, consider the `phonenumbers` library (Google's full rules) instead of growing the table by hand; that's a new dependency, so a decision.
