@@ -172,6 +172,31 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - Risk and mitigation: **owner-accepted legal risk.** Before the first consultancy signs, a lawyer should confirm how its privacy notice/DPA covers parental consent. Revisit this decision if a client or regulator objects; a consent flag can be added later without losing data.
 - Affects: `migrations/002_universal_core.sql` (drops `contacts_check`), PRD §5.2/§12.3/§17/Appendix A/Appendix C, INSTRUCTION.md P4.3.
 
+### D-015 Quick answers editable per company + contact-detail checks for international use
+- Date: 2026-09-23
+- Status: **accepted** (owner, 2026-09-23): "I want these modular based on company so that I can fix those questions' expected answers from my admin backend or user can"; "what else should it control, like email, if I'm talking about international"; approved the plan with "g"
+- Decision:
+  - Quick answers move from the knowledge file into the database, **per company**: code, trigger phrases, answers per language, follow-up buttons, optional action, on/off.
+  - **Who can edit:** the operator (any company) and the company's admin (own company only); counsellors can't. Enforced in the admin screens (Level 6); the database already keeps companies apart.
+  - **Company-admin edits go live immediately** (owner didn't choose between "immediately + undo" and "wait for approval"; the recommended default was applied). Every change is recorded by the database itself in `quick_answer_history` (before, after, who, when) and can be undone. An approval step can be added later if needed.
+  - One trigger phrase belongs to at most one quick answer per company (database rule, safe under concurrent edits).
+  - New contact-detail checks (P2.1b): email, name, country, year-month, timezone, https URL. `contacts.email` added. `tenants.settings` added for pack settings (e.g. `served_countries`).
+- Affects: `migrations/003_quick_answers_and_contact_details.sql`, PRD §6.8/§10, INSTRUCTION.md P1.4, P2.1b, P2.2, and Level 6 admin screens.
+
+### D-016 Pin `tzdata` as a runtime dependency
+- Date: 2026-09-24
+- Status: **accepted** (built in P2.1b under the approved plan; tiny, official source of timezone data)
+- Context: `valid_timezone` uses Python's `zoneinfo`. Windows has no system timezone database and slim Linux Docker images may not either. `tzdata` was installed only because `psycopg` pulls it in **on Windows only**, so the Linux server could lack it.
+- Decision: pin `tzdata==2026.4` in the runtime dependencies (PEP 615's recommended source).
+- Affects: `pyproject.toml`, `app/contact_details.py`, Dockerfile (P7.2); update the pin with other dependencies.
+
+### D-017 Faster test runs: parallel workers + reusable migrated copy
+- Date: 2026-09-24
+- Status: **accepted** (owner: "fix 1 test time")
+- Context: the full test run took 4-6.5 min (O-006). Measured: nearly all of it was creating/cloning and dropping a database per test (1-9 s each on this disk), not the tests.
+- Decision: (1) dev dependency `pytest-xdist==3.8.0`, `-n auto` in pytest config, so every gate command runs in parallel unchanged; coverage measures the workers (`patch = ["subprocess"]`). (2) `migrated_db_url` reuses one copy per worker and resets it after each test (TRUNCATE + restart sequences) instead of clone + drop; a schema fingerprint check re-clones if a test changed the structure.
+- Affects: `pyproject.toml`, `tests/conftest.py`, gate time.
+
 ---
 
 ## Change log
@@ -187,7 +212,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - Deleted files: none
 - Decisions referenced: D-001 (accepted); D-002, D-003, D-004 (proposed)
 - Gate result: n/a (no code)
-- Owner sign-off: pending
+- Owner sign-off: yes (2026-09-23), owner continued the build on top of it
 
 ### C-002 Owner decisions D-002, D-003, D-004
 - Date: 2026-09-23
@@ -200,7 +225,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - Deleted files: none
 - Decisions referenced: D-002, D-003, D-004
 - Gate result: n/a (no code)
-- Owner sign-off: pending
+- Owner sign-off: yes (2026-09-23), owner continued the build on top of it
 
 ### C-003 Portion P0.1: Project skeleton and tooling
 - Date: 2026-09-23
@@ -246,7 +271,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - Deleted files: none
 - Verification: in a scratch repo (not the project), 15 paths that must be ignored (`.env`, `.env.local`, `.env.production`, `.venv/`, caches, `*.log`, `*.pem`, `.vscode/`, `Thumbs.db`, `*.dump`, …) → all ignored; 8 that must be tracked (`.env.example`, `app/config.py`, tests, `pyproject.toml`, `migrations/001_init.sql`, docs, `.gitignore`) → all tracked.
 - Tests: unchanged (no code touched).
-- Owner sign-off: pending
+- Owner sign-off: yes (2026-09-23), owner continued the build on top of it
 
 ### C-005 Portion P0.2: Continuous integration
 - Date: 2026-09-23
@@ -272,7 +297,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - G9: this entry
 - Harness note: the first local replay failed because Python's `subprocess` resolved `bash` to the Windows WSL launcher (no Linux installed), not Git Bash. That was a test-harness problem, not a workflow bug; replayed directly in Git Bash instead.
 - `# pragma: no cover` uses: none
-- Owner sign-off: pending (after the G8 check on GitHub)
+- Owner sign-off: yes (2026-09-23): owner's GitHub Actions screenshot shows CI #1 (6e4595c) and CI #2 (f597125) green; each run = 3 jobs (ubuntu, windows, macos) with fail-fast off, so all three passed
 
 ### C-006 Switch PostgreSQL 16 → 18 (D-008)
 - Date: 2026-09-23
@@ -288,7 +313,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - History note: C-005 still says "Postgres 16"; that is what was true when it was written and is left unchanged.
 - Gate result: G1 68 passed · G2/G3 100% lines + branches · G4 clean (13 files formatted) · G6 68 passed · G7 68 passed ×3 · no remaining `16` references outside history.
 - Local check: `psql (PostgreSQL) 18.6` at `C:\Program Files\PostgreSQL\18\bin`.
-- Owner sign-off: pending
+- Owner sign-off: yes (2026-09-23), owner continued the build on top of it
 
 ### C-007 Local PostgreSQL set up (owner + Claude)
 - Date: 2026-09-23
@@ -345,7 +370,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - Verified locally: the exact `CREATE ROLE` line from `ci.yml` reaches PostgreSQL's permission check (so the SQL parses); refused only because the local test role can't create roles.
 - Gate result (full logs saved): G1 122 passed · G2/G3 100% (175 stmts, 44 branches) · G4 clean after fixing one line-too-long in `tests/test_ci.py` that the gate caught · G6 122 passed · G7 122 passed ×3 · no errors in any log.
 - **Not yet proven:** the Windows and macOS runs happen on GitHub after the owner's next push. Owner check (G8): Actions tab shows **3 green jobs** (ubuntu, windows, macos).
-- Owner sign-off: pending (after the 3 green jobs)
+- Owner sign-off: yes (2026-09-23): owner's GitHub Actions screenshot shows CI #1 (6e4595c) and CI #2 (f597125) green; each run = 3 jobs (ubuntu, windows, macos) with fail-fast off, so all three passed
 
 ### C-010 Portion P1.2: Core schema
 - Date: 2026-09-23
@@ -514,6 +539,112 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - G8: study_abroad pack loaded and printed: 13 fields; stages in English and Bangla (Bangla verified in the UTF-8 output file); Hot = phone present AND intake within 9 months AND (English score present OR test is MOI/booked) AND funding ≠ scholarship-only AND a target country the consultancy serves; Warm = phone AND target country AND intake within 18 months; flags refusal, long_gap, scholarship_only; matches PRD §5.3
   - G9: this entry
 - `# pragma: no cover` uses: none
+- Owner sign-off: yes (2026-09-23), by asking to go to P2.1 ("ok g 2.1"); hot/warm scoring confirmed: "keep it"
+
+### C-016 Portion P2.1: Phone normalization
+- Date: 2026-09-23
+- Type: portion
+- New files:
+  - `app/phones.py`: `normalize_phone(text, country="BD")` → E.164 (`+8801712345678`) or `None`; never raises on user input (only `ValueError` for an unsupported tenant country, a configuration error). Accepts `+`, `00` and no-plus-with-country-code forms, local numbers with the trunk 0 dropped; separators space, `-`, `.`, `(`, `)`; digits in any script (Bangla, Devanagari, full-width...) via `unicodedata.decimal` (superscripts rejected); input over 64 characters rejected; `+` only at the start. Bangladesh: mobile must be `+880 1[3-9]` + 8 digits (landlines rejected) and local numbers must start with 0 (no guessing). Other countries: calling-code table for BD, NP, IN, PK, LK, NG, MY, AE, SA, GB, US, CA, AU with national-number lengths; unknown codes follow general E.164 rules (8-15 digits, not starting with 0). `+880` numbers get Bangladesh rules whatever the tenant's country. Numbers inside sentences are not extracted (the AI passes only the number).
+  - `tests/test_phones.py`: 79 tests: 16 formats of one BD mobile (incl. Bangla, mixed and full-width digits), all 7 operator prefixes, 11 invalid BD numbers (012/010/011, short, long, landlines, no leading 0), 20 junk inputs (None, empty, letters, emoji, sentences, two numbers, double/misplaced plus, slash, underscore, hash, superscripts with and without leading 0, non-strings, 10,000 zeros), 8 other-country cases (Nepal with Devanagari digits, UK, Pakistan, India, US), +880 rules at a foreign tenant, local number follows the tenant's country, international length/start rules, 15 vs 16 digits outside the table, 64-character limit, 4 unsupported countries, calling-code table consistency; **4 hypothesis property tests** (any text never raises; phone-like text never raises; accepted numbers normalize to themselves; every valid BD mobile survives any separator and Bangla digits).
+- Changed files:
+  - `tests/conftest.py`: hypothesis profile `gate` (D-004): `derandomize=True`, `deadline=None`, `max_examples=500`, loaded for every run.
+- Deleted files: none
+- Decisions referenced: D-004, D-012 (international readiness PRD §19.1)
+- Bugs found:
+  1. **Wrong test expectation (mine):** I first expected `01712345678` at a UK tenant to be rejected; under UK rules it's a valid-looking UK number. Corrected to what matters: it's never turned into a Bangladeshi number.
+  2. **Mutation check found 2 test gaps** (the implementation was right; the tests didn't isolate the rule): superscript digits were only tested in a form another rule already rejected; the 15-digit limit was only tested with a `+1` number that the US rule rejected first. Added isolated tests; both now caught. Also added a test isolating the 64-character guard before running the check.
+- Gate result (full logs saved, stdout + stderr, exit codes):
+  - G4: ruff check exit 0; format exit 0 (28 files already formatted)
+  - G1: exit 0, `559 passed`
+  - G2/G3: `app/phones.py` 51 stmts, 30 branches, 100%; TOTAL 618 stmts, 258 branches, **100%**
+  - G6: reverse order: 559 passed
+  - G7: 559 passed ×3 (hypothesis derandomized: same inputs every run); no problems in any saved log; nothing changed during the gate; 0 leftover test databases
+  - Tests also pass without UTF-8 mode (the gate's plain Windows mode), so the Bangla test inputs don't hit O-009.
+  - Mutation check (crash-safe, restored byte-identical): **14/15 caught + 1 equivalent mutant**. Caught: 012 accepted, BD local without 0 guessed, superscripts as digits, ASCII-only digits, `_`/`/` allowed, 64-character guard removed, `+` anywhere, `00` not understood, `880` without `+` not understood, trunk 0 kept, leading 0 after `+`, 16 digits, unknown country silently BD, BD rule skipped. **Equivalent (can't change behaviour, no test possible):** widening the BD national length to 10-11, because the BD mobile pattern already requires exactly 10 digits.
+  - G8: none (pure function, per INSTRUCTION.md)
+  - G9: this entry
+- `# pragma: no cover` uses: none
+- Owner sign-off: yes (2026-09-23), by approving the next plan ("g")
+
+### C-017 Portion P1.4: Migration 003 (contact email, tenant settings, quick answers + history)
+- Date: 2026-09-23
+- Type: portion (data layer addition, D-015)
+- New files:
+  - `migrations/003_quick_answers_and_contact_details.sql`: `contacts.email` (format + ≤ 254 characters); `tenants.settings` (JSON object); SQL check functions for answers (2-letter language → non-empty text), triggers (non-empty, trimmed, lower-case) and button codes; `quick_answers` table (code per tenant unique, must have an answer or an action, `updated_at` trigger); trigger function `quick_answers_unique_triggers` (no phrase twice in a row, no phrase shared by two quick answers of one company, inactive rows still reserve phrases, per-company advisory lock so two admins saving at once are serialized); `quick_answer_history` with trigger `quick_answers_history` writing before/after/who (`app.user_id`)/when on every insert, update and delete, kept after deletion (no FK to the quick answer) so changes can be undone.
+  - `tests/test_migration_003.py`: 48 tests: valid/invalid emails incl. 254-character boundary, email optional; settings default and shape; quick answer defaults; 6 bad codes; code unique per company only; 10 invalid rows (answers shape, empty/non-text answer, bad language code, unknown action, empty/untrimmed/upper-case trigger, empty button); action-only row; Bangla trigger and answer; phrase clash on insert and on update; duplicate phrase in one row; editing a row keeps its own phrases; same phrase in two companies; inactive rows reserve phrases; **two admins saving the same phrase at once (second waits, then is rejected)**; history of create/update/delete with exact before/after; history survives deletion; who changed it (with and without a user); history carries the company; `updated_at` moves; deleting a company with quick answers refused.
+- Changed files:
+  - `tests/test_db.py`, `tests/test_health.py`, `tests/test_fixtures.py`: expect `003_quick_answers_and_contact_details.sql`.
+  - `tests/test_schema.py`: table list includes `quick_answers`, `quick_answer_history` (so the all-FKs-NO-ACTION, timestamptz, tenant-index and no-float checks cover them).
+  - `PRD.md` §6.8 F47 and §10; `INSTRUCTION.md` P1.4, new P2.1b, P2.2 rewritten for database quick answers; `DECISION.md` D-015, O-012.
+- Deleted files: none
+- Decisions referenced: D-010, D-012, D-015
+- Bugs found: none (all new tests passed first run; the mutation check below confirms they bite). One lint finding (long docstring) fixed.
+- Gate result (full logs saved, stdout + stderr, exit codes):
+  - G4: ruff check exit 0; format exit 0 (29 files already formatted)
+  - G1: exit 0, `607 passed`
+  - G2/G3: TOTAL 618 stmts, 258 branches, **100%** (SQL-only portion; Python coverage unchanged)
+  - G6: reverse order: 607 passed
+  - G7: 607 passed ×3; no problems in any saved log; nothing changed during the gate; 0 leftover test databases
+  - Mutation check (crash-safe, restored byte-identical): **16/16 caught** (email length, settings shape, answer language code, empty answer, upper-case and untrimmed triggers, answer-or-action rule, code uniqueness, cross-row clash, **lock between admins removed**, row clashing with itself on update, other companies' phrases colliding, duplicate in one row, history skipping deletes, history losing the "before", history ignoring who)
+  - G9: this entry
+- `# pragma: no cover` uses: none
+- Owner sign-off: yes (2026-09-24), "g" to continue to P2.1b
+
+### C-018 Portion P2.1b: Contact-detail checks (international)
+- Date: 2026-09-24
+- Type: portion (D-015)
+- New files:
+  - `app/contact_details.py`: `normalize_email` (trim; exactly one `@`; ASCII local part ≤ 64 with dot rules; domain lower-cased and IDNA-encoded, e.g. `münchen.de` → `xn--mnchen-3ya.de`; every label checked; alphabetic or IDN top-level domain; ≤ 254 total; result always satisfies the database's email rule); `normalize_name` (NFC, collapse spaces, 1-100 characters, letters of any script plus marks, `. ' - ’`, and the Bangla zero-width joiners; digits, emoji, symbols and letter-less names rejected); `normalize_country` (all 249 ISO 3166-1 alpha-2 codes, plus English and Bangla common names of source and study-destination countries, e.g. UK/England → GB, বাংলাদেশ → BD); `normalize_year_month` ("2027-01", "01/2027", "Jan 2027", "2027 Jan", "জানুয়ারি ২০২৭", "২০২৭-০৯" → "2027-01"; years 2000-2100; months 1-12; rejects two-digit years, full dates, extra words); `valid_timezone` (exact IANA names via `zoneinfo`); `normalize_https_url` (https only, real host (IDNA), no credentials, no spaces or control characters, ≤ 2048, valid port; scheme and host lower-cased; path, query and fragment kept).
+  - `tests/test_contact_details.py`: 220 tests: 8 valid and 37 invalid emails (incl. 254-character boundary and a 258-character case), 11 valid and 21 invalid names, Bangla joiners kept, name length boundary, 22 valid and 18 invalid countries, 17 valid and 24 invalid year-months, 5 valid and 17 invalid timezones (incl. path traversal), 7 valid and 25 invalid URLs; **5 hypothesis properties** (never raises; accepted values are stable; accepted emails satisfy the database rule; names/year-months well formed).
+- Changed files:
+  - `pyproject.toml`: `tzdata==2026.4` (D-016).
+  - `INSTRUCTION.md`: P2.1b added in the earlier docs change (C-017).
+- Deleted files: none
+- Decisions referenced: D-004, D-015, D-016
+- Bugs found:
+  1. **Wrong test (mine):** the "over 254 characters" email was only 249; corrected to 258.
+  2. **Raw invisible characters** (U+200C/U+200D) were written into the source and a test instead of `\u200c`/`\u200d` escapes; found with a byte scan and replaced, so nothing invisible remains in the code.
+  3. **Coverage found an untested line** (URL `#fragment`); tests added.
+  4. **Mutation check found redundant code:** converting other scripts' digits to ASCII before parsing month/year was unnecessary, because Python's `\d` and `int()` already handle Bangla and other digits (`int("২০২৭")` → 2027). Removed.
+  - The mutation harness printed decode errors reading pytest output (Windows cp1252 vs UTF-8, O-009); results come from exit codes and are valid.
+- Gate result (full logs saved, stdout + stderr, exit codes):
+  - G4: ruff check exit 0; format exit 0 (31 files already formatted)
+  - G1: exit 0, `827 passed`
+  - G2/G3: `app/contact_details.py` 112 stmts, 46 branches, 100%; TOTAL 730 stmts, 304 branches, **100%**
+  - G6: reverse order: 827 passed
+  - G7: the first gate run was cut off when the session ended, after G1-G6 had passed. After-crash checklist: no damaged files, all files identical to the gate's start (SHA-256), caches cleared, 1 leftover test database (from the interruption) cleaned automatically. Then G7: 827 passed ×3, no problems in any log, no file changed.
+  - Mutation check (crash-safe, restored byte-identical): **18/19 caught**; the 1 miss was the redundant digit conversion, now deleted (email: two `@`, dots anywhere in the local part, local part 65, domain not lower-cased, numeric TLD; name: no NFC, digits allowed, letter-less names, Bangla joiners rejected, 101 characters; country: case-sensitive aliases; year-month: 1999, month 13; timezone: case-insensitive; URL: http, credentials, spaces, fragment dropped)
+  - G8: none (pure functions)
+  - G9: this entry
+- Note: full test run now takes 4-6.5 minutes (O-006 threshold of 5 minutes reached).
+- `# pragma: no cover` uses: none
+- Owner sign-off: pending
+
+### C-019 Test speed-up (O-006)
+- Date: 2026-09-24
+- Type: test infrastructure (D-017)
+- New files: none
+- Changed files:
+  - `pyproject.toml`: `pytest-xdist==3.8.0` (dev), `-n auto` in addopts, coverage `patch = ["subprocess"]`.
+  - `tests/conftest.py`: leftover cleanup + session lock moved from a session fixture to `pytest_configure`/`pytest_unconfigure` in the **main process only**, so a parallel worker can never drop another worker's databases. `migrated_db_url` now reuses a per-worker copy: after each test it ends connections the test left open, compares a schema fingerprint (tables, columns, defaults, constraints, indexes, triggers, functions, types, enums, permissions, database settings, applied migrations) with the template, then TRUNCATEs every table except `schema_version` and restarts sequences. Fingerprint differs or reset fails → the copy is dropped and the next test gets a fresh clone.
+  - `tests/test_fixtures.py`: +18 tests: only the main process cleans up; reset empties every table but keeps migrations; IDs restart at 1; 11 kinds of structure change detected; changed database setting detected; a connection left holding a table lock is ended; seed really creates quick-answer history; a reused copy starts empty.
+  - `tests/test_config.py`: the random "truncated Fernet key" parameter got a fixed id (`truncated`).
+- Deleted files: none
+- Decisions referenced: D-004, D-017, O-006
+- Bugs found:
+  1. **Found by xdist:** a test parameter was a random key, so the test's name changed on every collection; parallel workers refused to run (they must collect identical tests). Fixed with a fixed id.
+  2. **My first reset used DELETE:** deleting quick answers fired the history trigger, which re-inserted history rows and broke the tenant foreign key. Switched to TRUNCATE (fires no row triggers); regression test added.
+  3. **A failed reset left a dirty copy** that failed the next 290 tests; the fixture now drops the copy whenever a reset fails or raises.
+  4. **My own edit** cut off the last three fixtures of conftest.py; ruff caught it (unused imports) and they were restored exactly.
+  - Session crashed mid-work: after-crash checklist run (no damaged files, caches cleared, 2 leftover databases cleaned automatically).
+- Gate result:
+  - G4: ruff check exit 0; format exit 0 (31 files)
+  - G1: 845 passed, serial 3:25 (was 4:49), **parallel 1:41**
+  - G2/G3: TOTAL 730 stmts, 304 branches, **100%** (workers included)
+  - G6: reverse order: 845 passed (1:51)
+  - G7: 845 passed ×3 (1:40, 1:51, 1:46), no problems in logs, 0 leftover databases
+- `# pragma: no cover` uses: none
 - Owner sign-off: pending
 
 ### Existing files at the start of the log
@@ -527,9 +658,11 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - **O-002** Git and GitHub are handled by the owner (2026-09-23): the owner runs `git init`, commits and pushes to a private repo. Claude doesn't run git commands on this project unless asked. Before each push, the owner checks that `.env` and `.venv/` aren't staged.
 - **O-003** (resolved 2026-09-23) Intermittent "1 error" in the test suite. Root cause: autovacuum race on `DROP DATABASE WITH (FORCE)` in the test fixture (C-008). Fixed with bounded retry + tests. **If any unexplained error appears again, P1.1 re-opens.**
 - **O-005** Tenant `timezone` is only checked for non-empty in the database (a CHECK can't look up the timezone list). Validate it against `zoneinfo.available_timezones()` in the operator console when a tenant is created or edited (P6.3).
-- **O-006** Gate time grew to ~2.5 min per full run (247 tests, most creating a database). If it passes ~5 min, consider running tests in parallel (would need a new dev dependency, so a decision).
+- **O-006** ~~Gate time~~ **Resolved (D-017, C-019):** full run 4-6.5 min → ~1:45 in parallel.
 - **O-007** Encryption-key rotation (PRD §12.2): `encrypt`/`decrypt` use one `FERNET_KEY`. Add rotation (e.g. `MultiFernet` with old + new keys, then re-encrypt stored secrets) with its runbook in P7.2.
 - **O-008** Before the first client signs: lawyer review of guardian consent for under-18 phone numbers (D-014) and of the DPA template.
 - **O-009** Windows console encoding (cp1252) can't print Bangla when output is redirected. When structured logging is built (P7.2), write logs as UTF-8 explicitly (e.g. `sys.stdout.reconfigure(encoding="utf-8")` or `PYTHONUTF8=1` in the service settings) and test a Bangla log line.
 - **O-010** `packs/study_abroad/prompt.md` and `knowledge_template.md` are now the source of truth; PRD Appendix A/B are copies. Change the pack files first and keep the PRD in step (or replace the appendices with pointers). The Docker image must include `packs/` (P7.2).
+- **O-011** `phones.py` has a small calling-code table (13 countries). If the product serves many more countries, consider the `phonenumbers` library (Google's full rules) instead of growing the table by hand; that's a new dependency, so a decision.
+- **O-012** Admin screens for quick answers (Level 6): list/add/edit/delete/switch off, history with one-click undo, permission checks (operator: all companies; company admin: own; counsellor: none), and a test that a company admin can't read or edit another company's answers.
 - **O-004** The test role `chatbot_test` isn't a superuser (good), so tests can't use superuser-only features. If a later portion needs one (e.g. an extension), grant it explicitly and log a decision; never make the test role a superuser.

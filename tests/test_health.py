@@ -50,6 +50,7 @@ def test_startup_runs_migrations_and_opens_pool(config):
             ("000_schema_version.sql",),
             ("001_init.sql",),
             ("002_universal_core.sql",),
+            ("003_quick_answers_and_contact_details.sql",),
         ]
     assert app.state.pool.closed  # shutdown closes the pool
 

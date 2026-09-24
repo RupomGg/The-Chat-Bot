@@ -239,7 +239,7 @@ Common questions are answered from fixed text, at zero AI cost, before the engin
   - Web: chips.
   A tap → look up the payload in the tenant's quick answers → send the fixed text (plus follow-up buttons if defined). No model call.
 - F46 (P0) **Exact typed match:** normalize the student's text (lowercase, trim, collapse spaces, strip punctuation/emoji) and look it up in the tenant's trigger phrases ("fees", "office kothay", "address", "ঠিকানা"). Hit → fixed answer. No fuzzy or similarity matching (§20).
-- F47 (P0) Quick answers live in the tenant's knowledge file ("Quick answers" section, Appendix B), so they're versioned and published together with the knowledge. The engine parses that section into a lookup table at publish time.
+- F47 (P0) **Quick answers live in the database (`quick_answers`), per company** (D-015): code, trigger phrases, answers per language, follow-up buttons, optional action, on/off. **Editable from the admin screens** by the operator (any company) and the company's admin (own company only); counsellors can't edit. Changes go live immediately; the database records every change (before/after, who, when) in `quick_answer_history`, so any change can be undone. The same trigger phrase can't belong to two quick answers of one company. The pack's knowledge template may seed a new company's first quick answers; after that the database is the source of truth.
 - F48 (P0) Quick-answer exchanges are stored as normal messages (role `bot`, `model = 'quick'`, cost 0), so the model sees them in history on the next free-text turn.
 - F49 (P1) Report metric: % of bot replies served free, per tenant per month.
 
@@ -410,6 +410,8 @@ Indexes on every `tenant_id` + time column used in lists; `jobs(status, run_at)`
 **As built (P1.2, `migrations/001_init.sql`):** `messages`, `notes` and `event_registrations` also carry `tenant_id`, and every child table references its parent through a composite key `(tenant_id, parent_id)`, so the database refuses rows that mix two clients' data (D-010). `branches`, `schedules` and `events` also have `created_at`. No foreign key cascades or nulls anything on delete: deleting a client with data is refused.
 
 **As built (`002_universal_core.sql`):** `tenants.industry` (default `study_abroad`); generic pipeline stages `new, contacted, qualified, booked, in_progress, won, lost`; minors' phones allowed (D-014); new table **`bot_turns`**, one row per bot reply with metadata only (source quick/llm/fallback/handoff, channel, model, language, latency, AI time, tokens, cost, tools used, stop reason, error code); AI usage moved there from `messages`, which now hold content only. `bot_turns` keeps no message text or phone numbers, so it can be kept after message text is deleted (D-013).
+
+**As built (`003_quick_answers_and_contact_details.sql`, D-015):** `contacts.email` (checked format, ≤ 254 characters); `tenants.settings` (values the industry pack asks for, e.g. `served_countries`); `quick_answers` (per-company fixed replies: code, normalized triggers, answers per language, buttons, action, on/off; one trigger phrase per company, enforced by a trigger with a per-company lock); `quick_answer_history` (written by the database on every insert/update/delete: before, after, who via `app.user_id`, when; kept after deletion so changes can be undone).
 
 ## 11. API surface
 

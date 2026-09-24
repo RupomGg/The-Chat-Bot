@@ -84,7 +84,7 @@ def test_known_envs_accepted(env_value):
     [
         "not-a-key",
         "a" * 44,  # right length, wrong content after base64 decoding
-        Fernet.generate_key().decode()[:-2],  # truncated
+        pytest.param(Fernet.generate_key().decode()[:-2], id="truncated"),
     ],
 )
 def test_invalid_fernet_key_fails_at_load(bad_key):

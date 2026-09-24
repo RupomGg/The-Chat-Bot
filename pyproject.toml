@@ -18,11 +18,13 @@ dependencies = [
     "itsdangerous==2.2.0",
     "cryptography==50.0.1",
     "sentry-sdk==2.70.0",
+    "tzdata==2026.4",  # timezone data on Windows and slim Linux images (D-016)
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest==9.1.1",
+    "pytest-xdist==3.8.0",  # parallel tests: the gate was over 5 minutes (O-006)
     "coverage==7.16.1",
     "ruff==0.16.8",
     "hypothesis==6.168.0",
@@ -35,7 +37,7 @@ packages = ["app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers --strict-config"
+addopts = "-ra --strict-markers --strict-config -n auto"
 filterwarnings = [
     "error",
     # starlette 1.6.0 uses an anyio alias deprecated in anyio 4.15 (upstream, not our code).
@@ -47,6 +49,7 @@ markers = ["live: calls a real external API; run on demand, never in CI"]
 [tool.coverage.run]
 branch = true
 source = ["app"]
+patch = ["subprocess"]  # measure the parallel test workers too
 
 [tool.coverage.report]
 show_missing = true

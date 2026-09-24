@@ -28,6 +28,8 @@ EXPECTED_TABLES = {
     "audit_events",
     "wa_billable",
     "bot_turns",
+    "quick_answers",
+    "quick_answer_history",
 }
 
 

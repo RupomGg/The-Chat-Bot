@@ -75,6 +75,7 @@ def test_real_migrations_directory_applies(db_url):
         "000_schema_version.sql",
         "001_init.sql",
         "002_universal_core.sql",
+        "003_quick_answers_and_contact_details.sql",
     ]
     cols = rows(
         db_url,

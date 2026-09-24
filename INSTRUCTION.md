@@ -151,6 +151,8 @@ Levels group portions. Finish a level before starting the next one. Every portio
   - CSRF token: valid for its session only; expired/other-session/missing → rejected.
 - Manual check: none beyond the gate (pure functions).
 
+**P1.4 Migration 003: contact details, tenant settings, quick answers + history** (added 2026-09-23, D-015): `contacts.email`, `tenants.settings`, `quick_answers`, `quick_answer_history` with database-written history and one-trigger-per-company rule (incl. two admins saving at once). Done: C-017.
+
 ### Level 2: Core domain logic (pure code, no network)
 
 Everything industry-specific comes from the tenant's **industry pack** (PRD §0, D-012). Portions in Levels 2–7 must never hard-code study-abroad rules in the core; they read them from the pack. The study_abroad pack is the only one built for now.
@@ -168,10 +170,20 @@ Everything industry-specific comes from the tenant's **industry pack** (PRD §0,
 - Corner cases: `01712345678`, `+8801712345678`, `8801712345678`, `008801712345678` → same E.164; spaces, dashes, dots and brackets stripped; **Bangla digits** `০১৭১২৩৪৫৬৭৮` converted; BD prefix `01[3-9]` enforced (`012…` rejected); wrong length rejected; landline-looking numbers rejected for BD; non-BD tenant (e.g. `+977` Nepal) validates by country length rules only; empty/None/emoji/letters rejected; a number embedded in a sentence is **not** extracted by this function (the model passes the number only); property tests (hypothesis): any accepted number re-normalizes to itself, and random unicode never raises (only returns "invalid").
 - Manual check: none.
 
-**P2.2 Knowledge file and quick answers**
-- Files: `app/knowledge.py`, `tests/test_knowledge.py`, `tests/fixtures/knowledge_demo.md`. PRD refs: §6.8, §9.3, Appendix B.
-- Corner cases: parse all quick-answer blocks; trigger normalization (case, surrounding spaces, repeated spaces, punctuation, emoji, trailing `?`/`।`) with Bangla text preserved; the **same trigger in two blocks → publish error** naming both; property test (hypothesis): normalization is idempotent and never raises for any unicode string; block with no answer in the student's language → falls back to the other language, and with no answer at all → publish error; unknown field in a block → error (catches typos); `action: start_booking` blocks have no answer text; empty Quick answers section is allowed; token count reported; the rendered system block is byte-identical across two renders; missing template variable → error, never an empty `{{x}}` left in text.
-- Manual check: parse the demo knowledge file and print the lookup table.
+**P2.1b Contact-detail checks** (added 2026-09-23, D-015)
+- Files: `app/contact_details.py`, `tests/test_contact_details.py`.
+- Functions, each returning a clean value or None (never raising on user input): `normalize_email` (trim, lower-case the domain, international domain names via IDNA, ≤ 254, one `@`, dotted domain); `normalize_name` (trim, collapse spaces, 1-100 characters, any script incl. Bangla, no control characters, not emoji-only); `normalize_country` (ISO 3166 two-letter code from code or common name, e.g. "Bangladesh"/"bd" → "BD"); `normalize_year_month` ("2027-01", "Jan 2027", "01/2027", "জানুয়ারি ২০২৭" → "2027-01"); `valid_timezone` (IANA names via `zoneinfo`); `normalize_https_url` (https only, real host, blocks `javascript:` and credentials in URLs).
+- Corner cases: each function's accepted formats, boundaries (254/100 characters, month 1-12, years), Bangla digits and month names, junk (None, non-strings, emoji, control characters, very long input); hypothesis properties (never raises; accepted values re-normalize to themselves).
+- Manual check: none (pure functions).
+
+**P2.2 Quick answers from the database** (was: from the knowledge file; changed by D-015)
+- Files: `app/quick_answers.py`, `app/knowledge.py`, `tests/test_quick_answers.py`, `tests/test_knowledge.py`. PRD refs: §6.8 (F45-F49), §9.3, D-015.
+- `normalize_trigger(text)`: the one normalization used when saving triggers **and** when matching student text (lower-case, trim, collapse spaces, strip punctuation incl. `?`, `।`, emoji; Bangla preserved), so they always agree. Satisfies the database's trigger rules.
+- `find_quick_answer(conn, tenant_id, *, payload=None, text=None, language)`: button payload → exact code; typed text → exact normalized trigger (no fuzzy matching); only `active` rows; only this tenant's rows; answer in the student's language, else English, else any available; returns follow-up buttons and action.
+- `save_quick_answer(...)`, `delete_quick_answer(...)`, `undo_change(history_id)`: validate and normalize before the database sees it; set `app.user_id` in the same transaction so history records who; undo restores the `before` of a history row (re-creating a deleted answer or reverting an edit); friendly errors for duplicate code or trigger clashes.
+- `app/knowledge.py`: business-info text for the AI prompt (versions, token count, byte-identical rendering, no stray `{{x}}`).
+- Corner cases: payload vs typed text; inactive answers ignored; another tenant's answer never returned; language fallback order; answer-less action rows; trigger normalization property tests (idempotent, never raises, Bangla kept); saving triggers that normalize to the same text → clash reported; undo of create/update/delete; undo twice; undo of a history row from another tenant refused; concurrent saves (database rule already tested in P1.4).
+- Manual check: create, edit, delete and undo a quick answer for the demo tenant and print the history.
 
 **P2.3 Lead scoring** (engine in core; the rules below are the study_abroad pack's, read from `pack.toml`)
 - Files: `app/scoring.py`, `tests/test_scoring.py`. PRD refs: §5.3.
