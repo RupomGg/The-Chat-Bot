@@ -829,7 +829,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - G8 manual check: 20 real questions (English, Banglish, Bangla, phones, links, prices): 0 blocked; 20 abuse attempts (jailbreaks, disguised, Banglish/Bangla, Python/SQL/C, base64): 0 let through.
 - Honest limit: phrase lists can't catch every rewording (e.g. homoglyph letters from other alphabets); the AI's core rules (D-018), the reply check and the eval set (P7.1) are the next layers.
 - `# pragma: no cover` uses: none
-- Owner sign-off: pending
+- Owner sign-off: **signed off** 2026-09-25 (CI green on ubuntu, windows, macos: "done all green")
 
 ### C-027 Fix: CI #5 failed on Linux and macOS (Cherokee letters in quick-answer triggers)
 - Date: 2026-09-25
@@ -840,6 +840,53 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - Tests: `tests/test_quick_answers.py`: the stability property now also asserts the result is lower-case (so this is caught on every OS, not only by a Linux database); new test for 3 Cherokee inputs. With the fix removed, 3 tests fail on Windows.
 - Gate: G4 exit 0 (43 files), invisible-character scan clean; G1 1453 passed; G2/G3 TOTAL 1250 / 514 **100%**; G6 1453 passed; G7 1453 ×3; no problems in logs; no file changed; 0 leftover databases.
 - Lesson → new rule in INSTRUCTION.md: a portion isn't finished until CI is green on all three OSes after the owner pushes (the databases on Linux/macOS behave differently from Windows).
+- `# pragma: no cover` uses: none
+- Owner sign-off: **signed off** 2026-09-25 (CI green on ubuntu, windows, macos: "done all green")
+
+### C-028 Portion P3.1: Job queue and worker (Level 3)
+- Date: 2026-09-25
+- Type: portion
+- New files:
+  - `app/jobs.py`: `enqueue` (kind, JSON payload checked at enqueue incl. NaN, optional delay, max attempts), `claim` (FOR UPDATE SKIP LOCKED; due pending jobs oldest first, or running jobs whose lock went stale; the claim time is a lock token), `complete` / `fail` (only by the current lock holder, so a worker that wakes up after a takeover can't overwrite the result; backoff 30 s doubling, capped at 1 h; dead after max attempts or when retry=False), `bury_abandoned` (a worker stopped during the last allowed attempt → dead + alert), `queue_stats` (due depth, oldest wait, dead count). Database clock only.
+  - `app/worker.py`: `Worker.run_once` (bury → claim → handler(conn, job) → complete, or fail with a logged retry / alert when dead; unknown kind → dead at once), `Worker.run` (loops without pausing while busy, polls when idle; stop() lets the current job finish), `main()` (`python -m app.worker`: waits for DB, migrates, SIGTERM/SIGINT stop gracefully and are restored afterwards). `HANDLERS` registry for later portions.
+  - `tests/test_jobs.py`: 53 tests: enqueue + 12 rejected inputs; claim, future not early, oldest first, running not re-claimed; **two workers never take the same job** (held lock + SKIP LOCKED) and **4 threads × 60 jobs: every job exactly once**; complete; backoff values; retry timing (30 s then 60 s); dead after max attempts; retry=False; error cut; **stale-lock takeover** (old worker can't finish/fail); recent lock respected; last-attempt burial; queue stats and `/healthz`; worker: handler + done log, idle, **fails twice then succeeds with retries logged**, alert once when dead, unknown kind, abandoned alert, **idempotent handler: duplicate delivery counted once**, takeover during handler, defaults; **stop during a job finishes it first**, idle polling, backlog drained without pausing, `main()` migrates and restores signal handlers.
+- Changed files: `app/main.py` (`/healthz` returns queue stats), `tests/test_health.py` (expects them).
+- Deleted files: none
+- Decisions referenced: PRD §8 (Postgres queue, not Redis)
+- Bugs found:
+  1. **Mine, before tests:** `main()` replaced the process's Ctrl+C/SIGTERM handlers for good (would break pytest's Ctrl+C); now restored on exit. The worker also migrates at start (it may start before the web service).
+  2. **Mutation check found a real throughput bug class untested:** a worker pausing after every job (100 queued messages = 100 s) passed all tests; added the backlog test (fails on that code, passes on ours).
+  3. Harness: one pattern wasn't unique (also in the docstring); now every pattern is checked for uniqueness before running.
+- Gate result (full logs saved):
+  - G4: ruff check exit 0; format exit 0 (46 files); invisible-character scan: clean; no backslashes in the new files
+  - G1: 1505 passed
+  - G2/G3: `app/jobs.py` 57 / 8, `app/worker.py` 64 / 20, `app/main.py` 22 / 0, all 100%; TOTAL 1372 / 542 **100%**
+  - G6: reverse order: 1505 passed
+  - G7: 1505 passed ×3 (4:30, 4:44, 5:26); no problems in logs; no file changed; 0 leftover databases
+  - Mutation check (crash-safe, restored byte-identical): **20/20 caught** after the fix above (removing SKIP LOCKED makes the second worker wait: caught as a hang by a time limit)
+  - G8 manual check: real worker, job failing twice then succeeding: "attempt 1/6 failed … retry in 2s", "attempt 2/6 failed … retry in 4s", "done on attempt 3" (demo backoff 2 s instead of 30 s); gaps measured 2.1 s and 4.1 s; queue empty, 0 dead.
+- **Test time over 5 minutes again (O-006):** 4:16-5:32 locally (CI on Linux: 46 s). Cause is this PC, not the tests: create/drop of a database is fast when idle (0.7 s / 0.2 s) but slow under the suite's load, PostgreSQL has done 1,093 forced checkpoints (one per created/dropped database), and **drive C: has only 4 GB free** (PostgreSQL's default data folder is on C:). Owner options listed in the report; no code change needed.
+- `# pragma: no cover` uses: none
+- Owner sign-off: approved 2026-09-25 ("g"); **CI confirmation pending** (not yet pushed)
+
+### C-029 Portion P4.1: Prompt assembly (Level 4)
+- Date: 2026-09-25
+- Type: portion (D-019)
+- New files:
+  - `app/prompts.py`: `build_request(...)` returns the `messages.create()` arguments: system = the rendered pack prompt + knowledge + core rules with **one cache breakpoint** (1-hour TTL when the tenant uses it); messages = this conversation after the last 72-hour silence, without internal `system` rows, the **last 12** only, starting with the customer; staff replies marked `[staff reply]`; quick answers included as the bot's; the new message last, with `<context>now=… <tenant timezone> (weekday); channel=…; profile={sorted compact JSON}; source_ad=…</context>` in front, so everything per-turn sits after the cached prefix. Student text (and history student messages) capped at 1,000 characters with "…(message shortened)". `max_tokens` 500; `temperature` 0.2 only for models that accept it (Haiku 4.5), never for Sonnet 5/Opus 5. `compact_json` for tool results and profile (no spaces, sorted keys, Bangla unescaped: fewer tokens).
+  - `tests/test_prompts.py`: 28 tests: system part byte-identical across turns and changes with knowledge; one breakpoint, 1-hour TTL; no per-turn value in the system part; exact context block (Dhaka and London); profile key order irrelevant; empty history; last 12; starts with the customer; 72-hour split, exactly 72 hours still the same conversation, everything older forgotten; order from timestamps; staff/quick answer/system rows; caps and exact-limit; compact JSON; temperature per model; tools only when given; naive time and empty system refused.
+- Changed files: none
+- Deleted files: none
+- Not built (spec listed `prompts/system.md`): the core rules already live in `app/knowledge.py` (`CORE_RULES`, D-018/D-019) and the industry prompt in each pack; a third file would duplicate them.
+- Bugs found: two of my tests were wrong (the pack prompt legitimately *mentions* the <context> block; "context" contains two x's, so counting "x" in the whole message was off by 2), and one assertion I wrote was always true (`== 11 + 1 - 0 or … == 12`); all fixed before the gate. The one backslash in `app/prompts.py` (the \n between context and message) checked per the backslash rule.
+- Gate result (full logs saved):
+  - G4: ruff check exit 0; format exit 0 (48 files); invisible-character scan: clean
+  - G1: 1533 passed
+  - G2/G3: `app/prompts.py` 61 stmts / 24 branches 100%; TOTAL 1433 / 566 **100%**
+  - G6: reverse order: 1533 passed
+  - G7: 1533 passed ×3 (3:54, 3:51, 3:49); no problems in logs; no file changed; 0 leftover databases
+  - Mutation check (crash-safe, restored byte-identical, patterns checked unique first): **19/19 caught**
+  - G8 manual check: demo consultancy request printed: 4-day-old and internal rows dropped, quick answer and "[staff reply]" in order, per-turn context only in the last message (Friday 15:30 Dhaka, sorted profile), max_tokens 500, temperature 0.2. The demo system part is ~2,000 tokens, below Haiku 4.5's 4,096-token caching minimum (known, D-019); real knowledge (5-10k tokens) will cache.
 - `# pragma: no cover` uses: none
 - Owner sign-off: pending (after CI is green)
 

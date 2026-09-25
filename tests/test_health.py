@@ -8,7 +8,10 @@ from app.main import create_app
 def test_healthz_ok(client):
     response = client.get("/healthz")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {
+        "status": "ok",
+        "queue": {"depth": 0, "oldest_age_seconds": 0.0, "dead": 0},
+    }
 
 
 def test_healthz_never_leaks_secrets(client, config):

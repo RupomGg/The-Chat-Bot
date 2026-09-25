@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app import db
+from app import db, jobs
 from app.config import Config, load_config
 
 
@@ -35,7 +35,8 @@ def create_app(config: Config | None = None) -> FastAPI:
     app.state.config = config
 
     @app.get("/healthz")
-    def healthz() -> dict[str, str]:
-        return {"status": "ok"}
+    def healthz() -> dict:
+        with app.state.pool.connection() as conn:
+            return {"status": "ok", "queue": jobs.queue_stats(conn)}
 
     return app
