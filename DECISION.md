@@ -920,7 +920,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - Mutation check (crash-safe, restored byte-identical, patterns checked unique first): **21/21 caught** after the rounding test
   - G8 manual check (one real two-turn call): **not run: no Anthropic API key** (owner has no budget for one yet; O-014).
 - `# pragma: no cover` uses: none
-- Owner sign-off: pending (after CI is green)
+- Owner sign-off: **signed off** 2026-09-26 (pushed in 6904649, CI green)
 
 ### C-031 Portion P4.2b: Gemini connection
 - Date: 2026-09-25
@@ -934,7 +934,34 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - Found on the way: my first two edit scripts failed in the shell (a quoting problem with long pasted scripts); nothing ran, files confirmed unchanged, and I switched to writing scripts to files. The official pages were read twice to cross-check model names and prices before they went into billing.
 - Gate result (full logs saved): G4 ruff check exit 0, format exit 0 (50 files), invisible-character scan clean, no backslashes in the changed files; G1 1604 passed (2 live tests deselected, as intended); G2/G3 app/llm.py 137 stmts / 30 branches 100%, TOTAL 1570 / 596 **100%**; G6 1604 passed; G7 1604 passed x3 (3:36, 3:33, 3:04); no problems in logs; no file changed; 0 leftover databases; mutation check (crash-safe, restored byte-identical, patterns checked unique first) **18/18 caught** on the first run; G8 manual check (one live Gemini reply): waiting for the owner to run it with the free key.
 - `# pragma: no cover` uses: none
-- Owner sign-off: pending (after CI is green and the one live Gemini reply)
+- Owner sign-off: **signed off** 2026-09-26 (pushed in 6904649, CI green; live Gemini reply deferred to O-014)
+
+### C-032 Portion P4.3: The AI's tools (+ pack terms and handoff reasons, Gemini tool rounds)
+- Date: 2026-09-26
+- Type: portion (D-014, D-020)
+- New files:
+  - `app/tools.py`: 7 industry-neutral tools with strict schemas (`additionalProperties: false` everywhere, no numeric/length limits, no id of any contact or company): `update_profile` (pack fields + name/phone/email/adult; every value re-validated: phones to E.164 with a hint, emails, names, choices case-insensitive, whole numbers 0-1000 (never true/false), lists deduped and capped, months as YYYY-MM; all-or-nothing with every problem listed; merges into the profile; rescores and reports "became_hot" once), `list_slots` (branch by name, from_date, local times, slot ids), `book_appointment` (saves name/phone, books, moves the stage to booked only from new/contacted/qualified/lost, retry-safe; full/closed/foreign-branch slots → error with 3 alternatives, details still saved), `register_event` (upcoming, own company, capacity under a row lock, retry-safe, re-register after cancelling; otherwise lists upcoming events), `log_unanswered` (event + streak), `off_topic` (event), `request_handoff` (core reasons + the pack's; state human, bot paused for the company's hours, one handoff only). `run()` never raises for bad input (unknown tool, invalid JSON, not an object → error result). `result_block()` builds the compact JSON tool_result.
+  - `tests/test_tools.py`: 79 tests (schemas strict for both packs; industry words and reasons; every tool's success path, every validation error, all-or-nothing, D-014 minor's phone stored, rescoring and single hot alert, flags, full slot with alternatives, stage never moved back, event capacity/past/foreign/idempotent/re-register, streak count, handoff once, pause setting, foreign conversation, another contact's id rejected and untouched).
+- Changed files:
+  - `app/packs.py`: required `[terms]` (appointment, staff; labels per language like stages) and optional `handoff_reasons` (identifiers, no clash with the 4 core reasons, no duplicates); `Pack.terms`, `Pack.handoff_reasons`.
+  - `packs/study_abroad/pack.toml`: terms "Counselling session" / "Counsellor" (en + bn); reasons visa_case, fee_dispute. `tests/fixtures/packs/pet_care_sample/pack.toml`: terms "Vet visit" / "Vet".
+  - `tests/test_packs.py`: +12 tests for terms and handoff reasons.
+  - `app/llm.py`: Gemini tool rounds: the model's own turn replayed unchanged (keeps thought signatures), tool results turned into function responses matched by call id (or position when Gemini gave no id); a Claude turn or an unknown call id is refused. `tests/test_llm.py`: the placeholder test replaced by 3 real ones.
+- Deleted files: none
+- Decisions referenced: D-014, D-019, D-020, D-021
+- Not built: `book_appointment` has no free-text notes (the bookings table has no column for them; add when an admin screen needs them).
+- Bugs found (mine): the date-window test forgot the 14-day window; a helper made a second web channel for one company (the same mistake as in P2.4); both fixed before the gate. The shell rejected two long pasted scripts again; scripts now go to files first.
+- Crash: the session ended during the first gate run (after lint, scan and G1: 1698 passed). After-crash checklist: no damaged files, every file byte-identical to the gate's start, caches cleared, PostgreSQL up, 7 leftover test databases cleaned automatically; full gate rerun from the start.
+- Gate result (rerun, full logs saved):
+  - G4: ruff check exit 0; format exit 0 (52 files); invisible-character scan: clean; no backslashes in the new code
+  - G1: 1698 passed (2 live tests deselected)
+  - G2/G3: `app/tools.py` 278 / 82, `app/packs.py` 325 / 170, `app/llm.py` 155 / 44, all 100%; TOTAL 1897 / 712 **100%**
+  - G6: reverse order: 1698 passed
+  - G7: 1698 passed x3 (3:27, 3:35, 3:40); no problems in logs; no file changed; 0 leftover databases
+  - Mutation check (crash-safe, restored byte-identical, patterns checked unique first): **25/25 caught** on the first run (tools, pack keys, Gemini tool rounds)
+  - G8: none in the spec (the tools run inside the engine; the demo chat in P4.5 shows them live)
+- `# pragma: no cover` uses: none
+- Owner sign-off: pending (after CI is green)
 
 ### Existing files at the start of the log
 - `PRD.md` (v2.1): product requirements. Source of truth for *what* to build.

@@ -15,6 +15,10 @@ in_progress = { en = "Visit in progress" }
 won = { en = "Visited" }
 lost = { en = "Lost" }
 
+[terms]
+appointment = { en = "Vet visit" }
+staff = { en = "Vet" }
+
 [[fields]]
 name = "pet_name"
 type = "text"

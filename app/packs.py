@@ -23,6 +23,8 @@ PRIORITIES = ("high", "medium", "low")
 SETTING_TYPES = ("list", "text", "int")
 BUILTIN_FIELDS = {"phone": "phone", "name": "text", "adult": "bool"}  # contact columns
 PROMPT_PLACEHOLDERS = {"business_name", "knowledge_markdown"}
+TERMS = ("appointment", "staff")  # each industry names these in its own words (D-020)
+CORE_HANDOFF_REASONS = ("asked_for_human", "complaint", "unanswered", "integrity")
 
 OPS_BY_TYPE = {
     "text": {"present", "absent", "eq", "ne", "in", "not_in"},
@@ -96,6 +98,8 @@ class Pack:
     tenant_settings: dict
     prompt: str
     knowledge_template: str
+    terms: dict = dataclasses.field(default_factory=dict)  # term → {language: label}
+    handoff_reasons: tuple = ()  # the pack's own, on top of CORE_HANDOFF_REASONS
 
 
 def _is_text(value) -> bool:
@@ -147,6 +151,34 @@ class _Checker:
             if stage not in GENERIC_STAGES:
                 self.add("stages", f"unknown '{stage}'")
         return {s: self.labels(f"stages.{s}", table[s]) for s in GENERIC_STAGES if s in table}
+
+    def terms(self, table) -> dict:
+        if not isinstance(table, dict):
+            self.add("terms", "must be a table")
+            return {}
+        for term in TERMS:
+            if term not in table:
+                self.add("terms", f"missing '{term}'")
+        for term in table:
+            if term not in TERMS:
+                self.add("terms", f"unknown '{term}'")
+        return {t: self.labels(f"terms.{t}", table[t]) for t in TERMS if t in table}
+
+    def handoff_reasons(self, items) -> tuple:
+        if not isinstance(items, list):
+            self.add("handoff_reasons", "must be a list of names")
+            return ()
+        seen = []
+        for reason in items:
+            if not isinstance(reason, str) or not IDENT.match(reason):
+                self.add("handoff_reasons", f"invalid name {reason!r}")
+            elif reason in CORE_HANDOFF_REASONS:
+                self.add("handoff_reasons", f"'{reason}' is already a core reason")
+            elif reason in seen:
+                self.add("handoff_reasons", f"'{reason}' is listed twice")
+            else:
+                seen.append(reason)
+        return tuple(seen)
 
     def fields(self, items) -> tuple:
         if not isinstance(items, list) or not items:
@@ -367,8 +399,18 @@ def load_pack(name: str, packs_dir: Path = PACKS_DIR) -> Pack:
     check.keys(
         "pack.toml",
         data,
-        {"name", "display_name", "version", "tenant_settings", "stages", "fields", "scoring"},
-        ("name", "display_name", "version", "stages", "fields", "scoring"),
+        {
+            "name",
+            "display_name",
+            "version",
+            "tenant_settings",
+            "stages",
+            "terms",
+            "handoff_reasons",
+            "fields",
+            "scoring",
+        },
+        ("name", "display_name", "version", "stages", "terms", "fields", "scoring"),
     )
     if data.get("name") != name:
         check.add("pack.toml", f"name '{data.get('name')}' doesn't match its folder '{name}'")
@@ -379,6 +421,8 @@ def load_pack(name: str, packs_dir: Path = PACKS_DIR) -> Pack:
         check.add("pack.toml", "version must be a whole number ≥ 1")
 
     stages = check.stages(data.get("stages", {}))
+    terms = check.terms(data.get("terms", {}))
+    handoff_reasons = check.handoff_reasons(data.get("handoff_reasons", []))
     fields = check.fields(data.get("fields"))
     settings = check.settings(data.get("tenant_settings", {}))
     known = {f.name: (f.type, f.choices) for f in fields}
@@ -400,4 +444,6 @@ def load_pack(name: str, packs_dir: Path = PACKS_DIR) -> Pack:
         tenant_settings=settings,
         prompt=texts["prompt.md"],
         knowledge_template=texts["knowledge_template.md"],
+        terms=terms,
+        handoff_reasons=handoff_reasons,
     )

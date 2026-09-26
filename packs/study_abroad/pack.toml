@@ -2,6 +2,8 @@
 name = "study_abroad"
 display_name = "Study-abroad consultancy"
 version = 1
+# On top of the core reasons (asked_for_human, complaint, unanswered, integrity).
+handoff_reasons = ["visa_case", "fee_dispute"]
 
 [tenant_settings]
 served_countries = "list"  # destinations this consultancy handles, e.g. ["uk", "malaysia"]
@@ -14,6 +16,10 @@ booked = { en = "Counselling booked", bn = "কাউন্সেলিং ব�
 in_progress = { en = "Counselled / applied", bn = "কাউন্সেলিং / আবেদন চলছে" }
 won = { en = "Enrolled", bn = "ভর্তি হয়েছে" }
 lost = { en = "Lost", bn = "হারানো" }
+
+[terms]
+appointment = { en = "Counselling session", bn = "কাউন্সেলিং সেশন" }
+staff = { en = "Counsellor", bn = "কাউন্সেলর" }
 
 [[fields]]
 name = "current_level"

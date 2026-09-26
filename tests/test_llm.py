@@ -486,10 +486,59 @@ def test_gemini_usage_and_cost_with_cache_and_thinking():
     assert out.cost_usd == Decimal("0.005280")
 
 
-def test_gemini_tool_rounds_wait_for_p4_3():
+def gemini_tool_round():
+    """A Gemini turn with two calls (one without an id), and our results for both."""
+    turn = G.Content(
+        role="model",
+        parts=[
+            G.Part(text="Let me check."),  # text before the calls
+            G.Part(
+                function_call=G.FunctionCall(id="g1", name="list_slots", args={}),
+                thought_signature=b"sig",
+            ),
+            G.Part(function_call=G.FunctionCall(name="off_topic", args={})),
+        ],
+    )
+    results = [
+        {"type": "tool_result", "tool_use_id": "g1", "content": '{"slots":[]}', "is_error": False},
+        {"type": "tool_result", "tool_use_id": "call_2", "content": '{"logged":true}'},
+    ]
+    return turn, results
+
+
+def test_gemini_tool_round_is_sent_back_matched_by_id():
+    turn, results = gemini_tool_round()
     req = gemini_request()
-    req["messages"].append({"role": "user", "content": [{"type": "tool_result"}]})
-    with pytest.raises(NotImplementedError, match="P4.3"):
+    req["messages"] += [
+        {"role": "assistant", "content": [turn]},
+        {"role": "user", "content": results},
+    ]
+    client = FakeGemini(g_response([G.Part(text="No open times, sorry.")]))
+    out = call(client, req)
+    assert out.text == "No open times, sorry."
+    contents = client.sent[0]["contents"]
+    assert contents[3] is turn  # replayed unchanged: the thought signature survives
+    assert contents[3].parts[1].thought_signature == b"sig"
+    responses = [p.function_response for p in contents[4].parts]
+    assert contents[4].role == "user"
+    assert [(r.id, r.name, r.response) for r in responses] == [
+        ("g1", "list_slots", {"slots": []}),
+        (None, "off_topic", {"logged": True}),  # no Gemini id: matched by position
+    ]
+
+
+def test_gemini_result_for_an_unknown_call_is_a_bug():
+    _, results = gemini_tool_round()
+    req = gemini_request()
+    req["messages"].append({"role": "user", "content": results})
+    with pytest.raises(ValueError, match="unknown call 'g1'"):
+        call(FakeGemini(g_response([G.Part(text="x")])), req)
+
+
+def test_gemini_cant_replay_a_claude_turn():
+    req = gemini_request()
+    req["messages"].append({"role": "assistant", "content": [text("from Claude")]})
+    with pytest.raises(ValueError, match="another provider"):
         call(FakeGemini(g_response([G.Part(text="x")])), req)
 
 

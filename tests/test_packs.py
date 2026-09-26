@@ -521,3 +521,69 @@ def test_rule_value_types(packs_dir, rule, message):
         assert load_pack(SAMPLE, packs_dir).scoring.warm
     else:
         assert message in error(packs_dir)
+
+
+# ---------- terms and handoff reasons (D-020) ----------
+
+
+def test_study_abroad_terms_and_handoff_reasons():
+    pack = load_pack("study_abroad")
+    assert pack.terms["appointment"]["en"] == "Counselling session"
+    assert pack.terms["staff"]["en"] == "Counsellor"
+    assert pack.handoff_reasons == ("visa_case", "fee_dispute")
+
+
+def test_other_industry_uses_its_own_words():
+    pack = load_pack(SAMPLE, FIXTURES)
+    assert pack.terms == {"appointment": {"en": "Vet visit"}, "staff": {"en": "Vet"}}
+    assert pack.handoff_reasons == ()  # optional
+
+
+def test_terms_are_required(packs_dir):
+    edit(packs_dir, '[terms]\nappointment = { en = "Vet visit" }\nstaff = { en = "Vet" }\n', "")
+    assert "pack.toml: missing key 'terms'" in error(packs_dir)
+
+
+def test_term_missing(packs_dir):
+    edit(packs_dir, 'staff = { en = "Vet" }\n', "")
+    assert "terms: missing 'staff'" in error(packs_dir)
+
+
+def test_term_unknown(packs_dir):
+    edit(packs_dir, 'staff = { en = "Vet" }', 'staff = { en = "Vet" }\nboss = { en = "Boss" }')
+    assert "terms: unknown 'boss'" in error(packs_dir)
+
+
+def test_terms_must_be_a_table(packs_dir):
+    edit(
+        packs_dir,
+        '[terms]\nappointment = { en = "Vet visit" }\nstaff = { en = "Vet" }\n',
+        "",
+    )
+    edit(packs_dir, "version = 1\n", 'version = 1\nterms = "vet"\n')
+    assert "terms: must be a table" in error(packs_dir)
+
+
+def test_term_needs_english_label(packs_dir):
+    edit(packs_dir, 'staff = { en = "Vet" }', 'staff = { bn = "ডাক্তার" }')
+    assert "terms.staff: needs an 'en' label" in error(packs_dir)
+
+
+@pytest.mark.parametrize(
+    "value, message",
+    [
+        ('"visa_case"', "handoff_reasons: must be a list of names"),
+        ('["Visa Case"]', "handoff_reasons: invalid name 'Visa Case'"),
+        ("[5]", "handoff_reasons: invalid name 5"),
+        ('["complaint"]', "handoff_reasons: 'complaint' is already a core reason"),
+        ('["vet_emergency", "vet_emergency"]', "handoff_reasons: 'vet_emergency' is listed twice"),
+    ],
+)
+def test_handoff_reasons_checked(packs_dir, value, message):
+    edit(packs_dir, "version = 1\n", f"version = 1\nhandoff_reasons = {value}\n")
+    assert message in error(packs_dir)
+
+
+def test_handoff_reasons_load(packs_dir):
+    edit(packs_dir, "version = 1\n", 'version = 1\nhandoff_reasons = ["vet_emergency"]\n')
+    assert load_pack(SAMPLE, packs_dir).handoff_reasons == ("vet_emergency",)

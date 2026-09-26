@@ -7,6 +7,7 @@ Outcomes: "reply" (text to send), "tool_use" (the engine runs the tools and call
 key, not the weather). The SDKs retry rate limits, overload, 5xx and network errors themselves.
 """
 
+import json
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -174,14 +175,35 @@ def _gemini_config(request: dict) -> genai_types.GenerateContentConfig:
 
 
 def _gemini_contents(request: dict) -> list:
-    contents = []
+    """Text turns, plus tool rounds: the model's own turn is passed back unchanged (it carries
+    Gemini's thought signatures), and each tool_result becomes a function response matched
+    to its call by id."""
+    contents, calls = [], {}  # our call id → (Gemini's id or None, function name)
     for message in request["messages"]:
-        if not isinstance(message["content"], str):
-            raise NotImplementedError("Gemini tool rounds arrive with the tools (P4.3)")
-        role = "user" if message["role"] == "user" else "model"
-        contents.append(
-            genai_types.Content(role=role, parts=[genai_types.Part(text=message["content"])])
-        )
+        content = message["content"]
+        if isinstance(content, str):
+            role = "user" if message["role"] == "user" else "model"
+            contents.append(genai_types.Content(role=role, parts=[genai_types.Part(text=content)]))
+        elif message["role"] == "assistant":
+            for turn in content:
+                if not isinstance(turn, genai_types.Content):
+                    raise ValueError("a Gemini request can't replay another provider's turn")
+                contents.append(turn)
+                for i, part in enumerate(turn.parts or []):
+                    if part.function_call:
+                        fc = part.function_call
+                        calls[fc.id or f"call_{i}"] = (fc.id, fc.name)
+        else:
+            parts = []
+            for block in content:
+                if block["tool_use_id"] not in calls:
+                    raise ValueError(f"tool result for unknown call {block['tool_use_id']!r}")
+                gemini_id, name = calls[block["tool_use_id"]]
+                response = genai_types.FunctionResponse(
+                    id=gemini_id, name=name, response=json.loads(block["content"])
+                )
+                parts.append(genai_types.Part(function_response=response))
+            contents.append(genai_types.Content(role="user", parts=parts))
     return contents
 
 
