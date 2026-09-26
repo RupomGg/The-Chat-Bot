@@ -220,6 +220,15 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - New industry = a new pack folder, no code or database change (PRD §0).
 - Affects: INSTRUCTION.md P2.4/P4.3, PRD §5 flow, F14, §9.4, Appendix A; `packs/study_abroad/prompt.md`.
 
+### D-021 Gemini for development and demos; Claude stays the default for paying clients
+- Date: 2026-09-25
+- Status: **accepted** (owner: "I don't have money or an API key for Anthropic models; I can manage a basic Gemini one" → "ok g")
+- Context: every gate test uses fake AI clients (no key, no cost), but the demo chat (P4.5) and real-AI checks need a real model. The owner has only a free Gemini key. Gemini was already the planned challenger (PRD §9.1, P7.1).
+- Decision: build the Gemini connection now (P4.2b) instead of in P7.1. Development, demos and real-AI checks run on `gemini-3.5-flash` with the free key. Claude Haiku 4.5 stays the default model for paying clients (per company setting, one change), unless the P7.1 bake-off says otherwise.
+- Model and prices checked on Google's official pricing and models pages on 2026-09-25 (two pages agree): `gemini-3.5-flash` $1.50 in / $9.00 out / $0.15 cached per million tokens, `gemini-3.5-flash-lite` $0.30 / $2.50 / $0.03; free tier available for both. Newer `gemini-3.8-flash` has several prices by serving method, so it isn't added until its standard price is clear.
+- **Privacy:** Google's free tier states content may be used to improve Google's products. Free-tier keys get made-up demo data only, never real students' messages; real clients run on a paid key (Google's paid tier, or Claude).
+- Affects: `app/llm.py`, `tests/test_llm.py`, INSTRUCTION.md P4.2b.
+
 ---
 
 ## Change log
@@ -867,7 +876,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - G8 manual check: real worker, job failing twice then succeeding: "attempt 1/6 failed … retry in 2s", "attempt 2/6 failed … retry in 4s", "done on attempt 3" (demo backoff 2 s instead of 30 s); gaps measured 2.1 s and 4.1 s; queue empty, 0 dead.
 - **Test time over 5 minutes again (O-006):** 4:16-5:32 locally (CI on Linux: 46 s). Cause is this PC, not the tests: create/drop of a database is fast when idle (0.7 s / 0.2 s) but slow under the suite's load, PostgreSQL has done 1,093 forced checkpoints (one per created/dropped database), and **drive C: has only 4 GB free** (PostgreSQL's default data folder is on C:). Owner options listed in the report; no code change needed.
 - `# pragma: no cover` uses: none
-- Owner sign-off: approved 2026-09-25 ("g"); **CI confirmation pending** (not yet pushed)
+- Owner sign-off: **signed off** 2026-09-25 (pushed in 8bc18ee, CI green: "yes done g")
 
 ### C-029 Portion P4.1: Prompt assembly (Level 4)
 - Date: 2026-09-25
@@ -888,7 +897,44 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - Mutation check (crash-safe, restored byte-identical, patterns checked unique first): **19/19 caught**
   - G8 manual check: demo consultancy request printed: 4-day-old and internal rows dropped, quick answer and "[staff reply]" in order, per-turn context only in the last message (Friday 15:30 Dhaka, sorted profile), max_tokens 500, temperature 0.2. The demo system part is ~2,000 tokens, below Haiku 4.5's 4,096-token caching minimum (known, D-019); real knowledge (5-10k tokens) will cache.
 - `# pragma: no cover` uses: none
+- Owner sign-off: **signed off** 2026-09-25 (pushed in 8bc18ee, CI green: "yes done g")
+
+### C-030 Portion P4.2: LLM call (Claude)
+- Date: 2026-09-25
+- Type: portion (D-019)
+- New files:
+  - `app/llm.py`: `call(client, request)` turns every result into an `Outcome`: "reply", "tool_use" (tool calls + raw blocks for the next round) or "fallback" with an action: "event" (cut off at max_tokens, no text, or a temporary API error: 429, 529 overloaded, 5xx, timeout, connection, after the SDK's own 2 retries), "handoff" (the model refused), "alert" (400/401/403/404/422: a bug or bad key, never retried). Other exceptions surface (bugs). `cost()`: exact to the millionth of a dollar (half rounds up), from input, output, cached reads (0.1×) and cache writes (1.25× for 5-minute, 2× for 1-hour caches, read from the request). Prices: Haiku 4.5 $1/$5, Sonnet 5 $2/$10 per million tokens (Anthropic's list). `check_model()` rejects unknown ids when a company is configured; `gemini-*` routes to a stub until P7.1. `make_client()`: 30 s timeout, 2 SDK retries. `count_tokens()` for exact counts (O-013) without output settings.
+  - `tests/test_llm.py`: 40 tests with a fake client (no network, no cost): every stop reason, 5 request errors alert, 5 temporary errors fall back quietly, other exceptions surface, client retry settings, cost (every token kind, per model, rounding incl. an exact half), usage incl. missing cache fields, 1-hour writes, known/unknown models, Gemini never sent to Anthropic, request settings reach the API, per-turn values after the breakpoint, count_tokens fields; plus 1 **live** test (two real turns, cache read > 0 on turn 2), deselected by default.
+- Changed files:
+  - `pyproject.toml`: pytest `addopts` adds `-m 'not live'`: live tests only run on demand (`pytest -m live -n 0 tests/test_llm.py`), never in CI and never counted as skipped.
+  - `tests/test_ci.py`: +1 test that live tests stay out of CI.
+- Deleted files: none
+- Decisions referenced: D-019
+- Bugs found: mutation check found no test for rounding an exact half ($0.0000005); added (5 cached reads → $0.000001, 4 → $0).
+- Gate result (full logs saved):
+  - G4: ruff check exit 0; format exit 0 (50 files); invisible-character scan: clean; no backslashes in the new files
+  - G1: 1573 passed (1 live test deselected, as intended)
+  - G2/G3: `app/llm.py` 79 stmts / 12 branches 100%; TOTAL 1512 / 578 **100%**
+  - G6: reverse order: 1573 passed
+  - G7: 1573 passed ×3 (3:27, 2:49, 2:45); no problems in logs; no file changed; 0 leftover databases
+  - Mutation check (crash-safe, restored byte-identical, patterns checked unique first): **21/21 caught** after the rounding test
+  - G8 manual check (one real two-turn call): **not run: no Anthropic API key** (owner has no budget for one yet; O-014).
+- `# pragma: no cover` uses: none
 - Owner sign-off: pending (after CI is green)
+
+### C-031 Portion P4.2b: Gemini connection
+- Date: 2026-09-25
+- Type: portion (D-021)
+- Changed files:
+  - `app/llm.py`: `call()` routes `gemini-*` to `_call_gemini` (same `Outcome`s as Claude): request translation (system_instruction, user/model turns, max_output_tokens 500, thinking MINIMAL, automatic function calling off, tool declarations from the same schemas); finish reasons and a blocked prompt mapped to event/handoff; errors: 429 → event, other 4xx → alert, 5xx/timeout/network → event; usage (cached part split out, thinking billed as output) and cost. `make_gemini_client()` (30 s timeout in milliseconds, 3 tries). `PRICES` gains the two Gemini models; `check_model()` now accepts priced models only (no blanket `gemini-*`). Claude path unchanged (moved into `_call_claude`).
+  - `tests/test_llm.py`: +32 cases built from the SDK's real response and error classes, offline: reply, request translation, routing both ways, tools declared and calls returned (missing call id filled), thoughts never sent to the customer, 6 finish reasons, no text, missing finish reason/content/usage, blocked prompt (with and without reason), 8 errors, usage/cost with cache and thinking, tool rounds refused until P4.3, client settings; 1 live Gemini test (deselected by default). The old "Gemini not implemented" test replaced.
+  - `INSTRUCTION.md`: new portion P4.2b.
+- New files: none. Deleted files: none
+- Decisions referenced: D-019, D-021
+- Found on the way: my first two edit scripts failed in the shell (a quoting problem with long pasted scripts); nothing ran, files confirmed unchanged, and I switched to writing scripts to files. The official pages were read twice to cross-check model names and prices before they went into billing.
+- Gate result (full logs saved): G4 ruff check exit 0, format exit 0 (50 files), invisible-character scan clean, no backslashes in the changed files; G1 1604 passed (2 live tests deselected, as intended); G2/G3 app/llm.py 137 stmts / 30 branches 100%, TOTAL 1570 / 596 **100%**; G6 1604 passed; G7 1604 passed x3 (3:36, 3:33, 3:04); no problems in logs; no file changed; 0 leftover databases; mutation check (crash-safe, restored byte-identical, patterns checked unique first) **18/18 caught** on the first run; G8 manual check (one live Gemini reply): waiting for the owner to run it with the free key.
+- `# pragma: no cover` uses: none
+- Owner sign-off: pending (after CI is green and the one live Gemini reply)
 
 ### Existing files at the start of the log
 - `PRD.md` (v2.1): product requirements. Source of truth for *what* to build.
@@ -904,6 +950,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - **O-006** ~~Gate time~~ **Resolved (D-017, C-019):** full run 4-6.5 min → ~1:45 in parallel.
 - **O-007** Encryption-key rotation (PRD §12.2): `encrypt`/`decrypt` use one `FERNET_KEY`. Add rotation (e.g. `MultiFernet` with old + new keys, then re-encrypt stored secrets) with its runbook in P7.2.
 - **O-008** Before the first client signs: lawyer review of guardian consent for under-18 phone numbers (D-014) and of the DPA template.
+- **O-014** The live Claude check (P4.2 manual check: two real turns, cache read > 0) waits for an Anthropic API key; the owner has none yet and only a free Gemini key. Run `pytest -m live -n 0 tests/test_llm.py` with `ANTHROPIC_API_KEY` set (about $0.01-0.02) before the first paying client goes live on Claude. The live Gemini check (P4.2b: one real reply with the free key, `pytest -m live -n 0 -s tests/test_llm.py -k gemini`) is also deferred: owner will add the key later; run it before the demo chat (P4.5) is signed off.
 - **O-013** `estimate_tokens` is a byte-based estimate (marked `ponytail:` in `app/knowledge.py`). Replace with the provider's token-count call when the AI client exists (P3).
 - **O-009** Windows console encoding (cp1252) can't print Bangla when output is redirected. When structured logging is built (P7.2), write logs as UTF-8 explicitly (e.g. `sys.stdout.reconfigure(encoding="utf-8")` or `PYTHONUTF8=1` in the service settings) and test a Bangla log line.
 - **O-010** `packs/study_abroad/prompt.md` and `knowledge_template.md` are now the source of truth; PRD Appendix A/B are copies. Change the pack files first and keep the PRD in step (or replace the appendices with pointers). The Docker image must include `packs/` (P7.2).

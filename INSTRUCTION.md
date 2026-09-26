@@ -232,6 +232,10 @@ Everything industry-specific comes from the tenant's **industry pack** (PRD §0,
 - One **real** smoke test, marked `@pytest.mark.live`, run on demand with a real key (not in CI): a two-turn chat shows `cache_read_input_tokens > 0` on turn 2.
 - Manual check: run the live smoke test once; record tokens and cost in DECISION.md.
 
+**P4.2b Gemini connection** (added 2026-09-25, D-021: the owner has a free Gemini key and no Anthropic budget yet)
+- Files: `app/llm.py` (extended), `tests/test_llm.py`. The same `call()` and `Outcome` for `gemini-*` models: system prompt → `system_instruction`, bot turns → role `model`, `max_output_tokens` 500, thinking at `MINIMAL` (thinking tokens count against the reply budget), automatic function calling off (our engine runs tools), tools declared from the same schemas; finish reasons MAX_TOKENS → event, SAFETY/PROHIBITED_CONTENT/BLOCKLIST/SPII/RECITATION and a blocked prompt → handoff, other non-STOP → event; errors 429 → event (free-tier quota), other 4xx → alert, 5xx/timeout/network → event; cost from usage (cached tokens 0.1×, thinking billed as output). Priced models only (gemini-3.5-flash, gemini-3.5-flash-lite). Tool rounds (thought signatures) come with P4.3.
+- Manual check: one live reply with the owner's free key (`pytest -m live -n 0 tests/test_llm.py -k gemini -s`), made-up data only.
+
 **P4.3 Tools**
 - Files: `app/tools.py`, `tests/test_tools.py`, `app/packs.py` (extended). PRD refs: §9.4, §5.2.
 - **Industry-neutral tools (D-020):** `update_profile`, `list_slots`, `book_appointment`, `register_event`, `log_unanswered`, `off_topic`, `request_handoff`. `request_handoff.reason` = core reasons (`asked_for_human`, `complaint`, `unanswered`, `integrity`) + the pack's own `handoff_reasons` (study_abroad: `visa_case`, `fee_dispute`). The pack loader gains `handoff_reasons` (identifiers, no clash with core reasons) and `[terms]` (`appointment`, `staff`: a label per language, same rules as stage labels); tests with both packs.

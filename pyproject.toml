@@ -37,7 +37,7 @@ packages = ["app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers --strict-config -n auto"
+addopts = "-ra --strict-markers --strict-config -n auto -m 'not live'"  # live: on demand only
 filterwarnings = [
     "error",
     # starlette 1.6.0 uses an anyio alias deprecated in anyio 4.15 (upstream, not our code).

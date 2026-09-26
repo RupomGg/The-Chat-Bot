@@ -104,3 +104,9 @@ def test_warnings_are_errors_in_config_used_by_ci():
 
 def test_coverage_measures_branches():
     assert PYPROJECT["tool"]["coverage"]["run"]["branch"] is True
+
+
+def test_live_api_tests_never_run_by_default():
+    # They call a paid API with a real key: only on demand (pytest -m live), never in CI.
+    assert "-m 'not live'" in PYPROJECT["tool"]["pytest"]["ini_options"]["addopts"]
+    assert "-m live" not in RUN
