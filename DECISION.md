@@ -961,7 +961,18 @@ Every decision and every file created, changed or deleted is recorded here, newe
   - Mutation check (crash-safe, restored byte-identical, patterns checked unique first): **25/25 caught** on the first run (tools, pack keys, Gemini tool rounds)
   - G8: none in the spec (the tools run inside the engine; the demo chat in P4.5 shows them live)
 - `# pragma: no cover` uses: none
-- Owner sign-off: pending (after CI is green)
+- Owner sign-off: **signed off** 2026-09-26 (pushed in b888505, CI green)
+
+### C-033 Portion P4.4: Conversation engine
+- Date: 2026-09-26
+- New files: `app/engine.py` (one message in, at most one reply out; per-contact lock; duplicates; redaction; paused conversations silent; media reply; quick answers first; monthly hard cap with one alert; 1-hour off-topic redirect after 3 in a row; daily AI cap per contact (tenant setting, resets at local midnight; no AI but the bot isn't paused, so quick answers still work; staff told once a day); input and reply guards; AI with up to 5 tool rounds; streak resets; unanswered x2 handoff; hot lead and handoff notifications; fallbacks always hand over; bot_turns performance row), `migrations/004_engine_limits.sql` (tenants.daily_ai_reply_cap default 60; conversations.off_topic_streak, redirect_until), `tests/test_engine.py` (38 tests, scripted fake AI).
+- Changed: `tests/test_db.py`, `tests/test_health.py`, `tests/test_fixtures.py` (migration 004 in the lists; the reset test no longer hard-codes the migration count).
+- Decision made here: daily cap does not pause the bot (spec said "handoff" and "quick answers still work", which conflict); logged here, owner to confirm.
+- Found: engine events used the database clock while limits use the message clock (fixed: one clock); f-string SQL removed (linter); 3 test mistakes fixed; mutation check found that no test caught a missing contact lock (two messages after a 72-hour silence would make two conversations) - test added; mutations 25/25 caught after that.
+- Coverage of app/engine.py: 100% (236 stmts / 66 branches).
+- Gate result (full logs saved): G4 ruff check exit 0, format exit 0 (54 files), invisible-character scan clean, no backslashes in the new code; G1 1736 passed; G2/G3 app/engine.py 236 / 66 100%, TOTAL 2133 / 778 **100%**; G6 1736 passed; G7 1736 passed x3 (3:59, 4:01, 3:33); no problems in logs; no code file changed during the gate; 0 leftover databases. The gate finished while the session was paused for its usage limit; results read afterwards from the saved output.
+- Manual check: in P4.5 (CLI demo), per the spec.
+- Owner sign-off: pending
 
 ### Existing files at the start of the log
 - `PRD.md` (v2.1): product requirements. Source of truth for *what* to build.

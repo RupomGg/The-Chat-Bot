@@ -91,6 +91,7 @@ def test_migrated_copy_has_every_migration(migrated_db_url):
         "001_init.sql",
         "002_universal_core.sql",
         "003_quick_answers_and_contact_details.sql",
+        "004_engine_limits.sql",
     ]
 
 
@@ -231,7 +232,7 @@ def test_reset_empties_every_table_but_keeps_migrations(spare_copy):
     seed(url)
     assert conftest._reset_copy(admin, name, fingerprint) is True
     counts = row_counts(url)
-    assert counts.pop("schema_version") == 4
+    assert counts.pop("schema_version") == 5
     assert set(counts.values()) == {0}
     assert conftest._schema_fingerprint(url) == fingerprint
 
@@ -291,7 +292,9 @@ def test_reset_ends_a_connection_the_test_left_in_a_transaction(spare_copy):
             left_open.execute("SELECT 1")
     finally:
         left_open.close()
-    assert set(row_counts(url).values()) == {0, 4}
+    counts = row_counts(url)
+    assert counts.pop("schema_version") > 0  # the applied migrations stay
+    assert set(counts.values()) == {0}
 
 
 def test_seed_really_fills_history(spare_copy):
@@ -306,5 +309,5 @@ def test_seed_really_fills_history(spare_copy):
 def test_reused_copy_starts_empty(migrated_db_url):
     # Runs after other tests in this process that used (and filled) the same copy.
     counts = row_counts(migrated_db_url)
-    assert counts.pop("schema_version") == 4
+    assert counts.pop("schema_version") == 5
     assert set(counts.values()) == {0}
