@@ -972,7 +972,29 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - Coverage of app/engine.py: 100% (236 stmts / 66 branches).
 - Gate result (full logs saved): G4 ruff check exit 0, format exit 0 (54 files), invisible-character scan clean, no backslashes in the new code; G1 1736 passed; G2/G3 app/engine.py 236 / 66 100%, TOTAL 2133 / 778 **100%**; G6 1736 passed; G7 1736 passed x3 (3:59, 4:01, 3:33); no problems in logs; no code file changed during the gate; 0 leftover databases. The gate finished while the session was paused for its usage limit; results read afterwards from the saved output.
 - Manual check: in P4.5 (CLI demo), per the spec.
-- Owner sign-off: pending
+- Owner sign-off: **signed off** 2026-09-27 (pushed in a57bfb3, CI #10 green; daily-cap choice not objected to)
+
+### C-034 Portion P4.5: Demo company and terminal chat (Level 4 code complete)
+- Date: 2026-09-27
+- New files:
+  - `tenants/demo/knowledge.md`: Demo Consultancy business info, labelled as made-up sample data (UK, Malaysia, Canada, fees, process, documents, handoff rules); no blanks.
+  - `app/demo.py`: `seed(conn, model=...)` creates or updates the demo company (web channel, Banani + Online branches open Sat-Thu, 3 quick answers FEES/OFFICE/BOOK in English and Bangla, the knowledge published); running it again changes nothing, an edited knowledge file is published as a new version. The demo marks its knowledge as eval-passed (real companies pass P7.1 first).
+  - `app/chat.py`: `python -m app.chat` (fake AI by default: no key, no cost, nothing leaves the computer), `--gemini`, `--claude`; commands /tap CODE, /new, /quit; Ctrl+C and end of input quit cleanly; missing key or unreachable database give a one-line message (password never shown); settings from the environment or `.env`.
+  - `tests/test_demo.py`: 25 tests.
+- Changed files:
+  - `app/guard.py`: two patterns found by the demo run: "you are ChatGPT now" (another word order) and plain requests for code ("write me a Python function", "fix my sorting algorithm"), kept narrow; `tests/test_guard.py` +8 real questions that must pass ("Do you have Python courses?", "Can you help me choose a Python course?", "help me write my SOP", …) and +6 blocked.
+  - `INSTRUCTION.md` (P4.5 files), `DECISION.md` (O-015, O-016).
+- Deleted files: none
+- Found:
+  1. **The chat crashed with a raw error on a wrong database password** (found running it for real); now a clear message, tested.
+  2. **4 of 5 misuse attempts reached the AI** in the demo run; 2 kinds are now blocked for free (4 of 5 blocked on the rerun). "Do my homework" is left to the AI's core rules on purpose (a pattern would block real questions like "do my assignment deadlines matter?").
+  3. Mutation checks: demo/chat 14/15 at first (the `--claude` mode silently using the fake AI wasn't tested; now 15/15); new guard patterns 3/4 at first (a too-broad verb list wasn't tested; now 4/4).
+  5. **Found by the owner setting up the database:** a malformed DATABASE_URL (the name pasted twice) still gave a raw crash; now a clear message showing the expected format, tested (26 demo tests).
+  4. O-015 (events), O-016 (the owner's development database: the `chatbot` role in `.env` is rejected by PostgreSQL).
+- Gate result (full logs saved): G4 ruff check exit 0, format exit 0 (58 files), invisible-character scan clean, no backslashes in new code; G1 1774 passed; G2/G3 `app/chat.py` 91 / 26, `app/demo.py` 36 / 12, `app/guard.py` 62 / 26, all 100%, TOTAL 2260 / 816 **100%**; G6 1774 passed (5:26: just over the 5-minute target again, same slow-disk cause as O-006); G7 1774 x3 (4:43, 4:28, 4:47); no problems in logs; no file changed; 0 leftover databases.
+- Manual check: the real `python -m app.chat` run (fake AI) on a temporary database with a script: quick answers in English and Bangla (typed, tapped), booking tap handed to the AI, new customer, 5 misuse attempts (4 blocked for free after the fix). **Still open:** real AI replies in Bangla, Banglish and English need the Gemini key (O-014), plus the P4.4 check that the AI declines "do my homework" itself.
+- `# pragma: no cover` uses: none
+- Owner sign-off: pending (after CI is green; real-AI part pending O-014)
 
 ### Existing files at the start of the log
 - `PRD.md` (v2.1): product requirements. Source of truth for *what* to build.
@@ -989,6 +1011,8 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - **O-007** Encryption-key rotation (PRD §12.2): `encrypt`/`decrypt` use one `FERNET_KEY`. Add rotation (e.g. `MultiFernet` with old + new keys, then re-encrypt stored secrets) with its runbook in P7.2.
 - **O-008** Before the first client signs: lawyer review of guardian consent for under-18 phone numbers (D-014) and of the DPA template.
 - **O-014** The live Claude check (P4.2 manual check: two real turns, cache read > 0) waits for an Anthropic API key; the owner has none yet and only a free Gemini key. Run `pytest -m live -n 0 tests/test_llm.py` with `ANTHROPIC_API_KEY` set (about $0.01-0.02) before the first paying client goes live on Claude. The live Gemini check (P4.2b: one real reply with the free key, `pytest -m live -n 0 -s tests/test_llm.py -k gemini`) is also deferred: owner will add the key later; run it before the demo chat (P4.5) is signed off.
+- **O-015** The AI can't see which events exist: `register_event` needs an event id, but event ids come from the database and the knowledge is fixed text. Fix before events go live: put the upcoming events (id, title, time) in the per-turn context block, or add a `list_events` tool. Until then the demo has no events.
+- **O-016** ~~Development database~~ **Resolved 2026-09-28:** role and database `chatbot` created by the owner, `.env` line fixed; the demo chat runs against it. Was: the owner's development database isn't set up: `.env` has `DATABASE_URL` for a user `chatbot` that PostgreSQL rejects (tests use the separate `chatbot_test` role, so they're unaffected). Create the role and database (steps given in the P4.5 report) before running `python -m app.chat` against it.
 - **O-013** `estimate_tokens` is a byte-based estimate (marked `ponytail:` in `app/knowledge.py`). Replace with the provider's token-count call when the AI client exists (P3).
 - **O-009** Windows console encoding (cp1252) can't print Bangla when output is redirected. When structured logging is built (P7.2), write logs as UTF-8 explicitly (e.g. `sys.stdout.reconfigure(encoding="utf-8")` or `PYTHONUTF8=1` in the service settings) and test a Bangla log line.
 - **O-010** `packs/study_abroad/prompt.md` and `knowledge_template.md` are now the source of truth; PRD Appendix A/B are copies. Change the pack files first and keep the PRD in step (or replace the appendices with pointers). The Docker image must include `packs/` (P7.2).

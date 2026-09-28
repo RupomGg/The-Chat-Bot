@@ -103,6 +103,10 @@ ENGLISH = (
     "pretend (?:you are|you re|that you are)",  # not "can I pretend to be employed"
     f"act as (?:a |an |my |the )?(?:[^ ]+ ){{0,2}}{_AI}",
     "role ?play",
+    # Found by the P4.5 demo run: another word order, and plain requests for code.
+    "(?:you are|you re) (?:now )?(?:chatgpt|gpt|gemini|claude|dan)",
+    "(?:write|fix|debug|solve|explain|build) (?:me |my |this |a |an |the |some )*"
+    "(?:[^ ]+ ){0,2}(?:code|python|java|javascript|sql|function|algorithm|script)",
     "repeat (?:the |all |everything |your )?(?:text |words |instructions |prompt )?above",
     "(?:print|show|reveal|tell me|output|display|give me) (?:me )?(?:your|the) (?:system )?"
     "(?:prompt|instructions)",  # not "tell me the rules for dependants"

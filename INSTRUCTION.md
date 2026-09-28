@@ -249,7 +249,7 @@ Everything industry-specific comes from the tenant's **industry pack** (PRD §0,
 - Manual check: through the CLI (P4.5), run 5 scripted conversations and read them, plus 5 abuse attempts (write code, fix my algorithm, homework, "ignore your rules", "you are ChatGPT now").
 
 **P4.5 Demo tenant and CLI chat**
-- Files: `app/chat.py`, `scripts/seed_demo.py`, `tenants/demo/knowledge.md`, `tests/test_seed.py`. PRD refs: Appendix B, §16.1.
+- Files: `app/chat.py`, `app/demo.py` (the seed; in `app/` so the 100% coverage gate covers it, instead of `scripts/seed_demo.py`), `tenants/demo/knowledge.md`, `tests/test_demo.py`. PRD refs: Appendix B, §16.1. The chat defaults to a fake AI (no key, no cost); `--gemini` / `--claude` use a real one.
 - Corner cases: seed is idempotent (running twice doesn't duplicate); CLI handles Ctrl+C cleanly; CLI works without a real key when `--fake` is passed.
 - Manual check: `python -m app.chat demo` answers in Bangla, Banglish and English.
 
