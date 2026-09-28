@@ -229,6 +229,16 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - **Privacy:** Google's free tier states content may be used to improve Google's products. Free-tier keys get made-up demo data only, never real students' messages; real clients run on a paid key (Google's paid tier, or Claude).
 - Affects: `app/llm.py`, `tests/test_llm.py`, INSTRUCTION.md P4.2b.
 
+### D-022 Website chat API: allowed websites, limits and reply format
+- Date: 2026-09-28
+- Status: **proposed** (P5.1; owner confirms with the portion sign-off)
+- Allowed websites: each company lists exact origins (`https://site.com`) or subdomain rules (`https://*.site.com`, which don't cover the bare domain). Everything else is refused, including `null` (local files, sandboxed frames), a missing Origin, another port or scheme, and lookalikes. Origin checks only stop other websites' pages; scripts can fake Origin, which is what the limits are for.
+- Limits: 10 messages a minute per visitor (F8) and 30 a minute per IP address (several students may share an office or phone network), each per company, answered with 429 and Retry-After. Kept in each web process's memory: with N processes each allows the limit; Cloudflare also limits `/api/chat` (PRD §12). Move to the database if that matters.
+- Reply format: one SSE `reply` event `{text, buttons, after}`. The engine works out and stores the reply before the first byte is sent, so a visitor who leaves mid-reply loses nothing; `after` is the id to poll from. Token-by-token streaming isn't needed for 1-4 sentence replies and can be added later as extra events.
+- Visitor ids: 16-64 random characters from the widget. Anyone with the id can read that chat by polling, so the widget must make it random (P5.2).
+- AI keys: `ANTHROPIC_API_KEY` and `GEMINI_API_KEY` are optional settings; the app sets up only the AIs that have a key.
+- Affects: `app/channels/web.py`, `app/main.py`, `app/config.py`, `.env.example`, `pyproject.toml`.
+
 ---
 
 ## Change log
@@ -994,7 +1004,26 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - Gate result (full logs saved): G4 ruff check exit 0, format exit 0 (58 files), invisible-character scan clean, no backslashes in new code; G1 1774 passed; G2/G3 `app/chat.py` 91 / 26, `app/demo.py` 36 / 12, `app/guard.py` 62 / 26, all 100%, TOTAL 2260 / 816 **100%**; G6 1774 passed (5:26: just over the 5-minute target again, same slow-disk cause as O-006); G7 1774 x3 (4:43, 4:28, 4:47); no problems in logs; no file changed; 0 leftover databases.
 - Manual check: the real `python -m app.chat` run (fake AI) on a temporary database with a script: quick answers in English and Bangla (typed, tapped), booking tap handed to the AI, new customer, 5 misuse attempts (4 blocked for free after the fix). **Still open:** real AI replies in Bangla, Banglish and English need the Gemini key (O-014), plus the P4.4 check that the AI declines "do my homework" itself.
 - `# pragma: no cover` uses: none
-- Owner sign-off: pending (after CI is green; real-AI part pending O-014)
+- Owner sign-off: **signed off** 2026-09-28 (pushed in 63dd15e, owner: "g" after CI; real-AI part still pending O-014)
+
+### C-035 Portion P5.1: Website chat API
+- Date: 2026-09-28
+- New files:
+  - `app/channels/__init__.py`, `app/channels/web.py`: `POST /api/chat/{slug}` (SSE reply), `OPTIONS` (the browser's permission check), `GET /api/chat/{slug}/poll`; origin allow-list, per-visitor and per-IP limits, strict body checks (malformed JSON, bad UTF-8, unknown fields → 400, nothing stored); resent message ids answered once (D-022).
+  - `tests/test_web.py`: 80 tests.
+- Changed files:
+  - `app/main.py`: builds the engine from the config's AI keys (`ai_clients`), the two rate limits, the web routes; `create_app(config, engine)` so tests give a fake AI.
+  - `app/config.py`: optional `anthropic_api_key`, `gemini_api_key` (hidden in printouts).
+  - `pyproject.toml`: packages `app.channels` too (an installed copy would have missed it).
+  - `.env.example`: the two AI keys.
+- Deleted files: none
+- Found:
+  1. Mutation check 19/22 at first: two survivors were code that could never run (an explicit `null` origin check, already refused by the exact-form check; a `max(1, …)` on a wait that is always ≥ 1), both deleted; one was a weak test (the per-company visitor limit didn't use a second company), rewritten. 20/20 after.
+  2. O-017 (real visitor IP behind the proxy).
+- Gate result (full logs saved): G4 ruff check exit 0, format exit 0 (61 files), invisible-character scan clean, no backslashes in new code; G1 1856 passed (5:11); G2/G3 `app/channels/web.py` 135 / 52, `app/main.py` 35 / 4, `app/config.py` 63 / 18, all 100%, TOTAL 2414 / 872 **100%**; G6 1856 passed (4:58); G7 1856 x3 (4:52, 4:52, 4:48); no warnings or errors in logs; no file changed; 0 leftover databases.
+- Manual check: none yet; the widget (P5.2) is the first real browser client.
+- `# pragma: no cover` uses: none
+- Owner sign-off: pending (after CI is green)
 
 ### Existing files at the start of the log
 - `PRD.md` (v2.1): product requirements. Source of truth for *what* to build.
@@ -1013,6 +1042,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - **O-014** The live Claude check (P4.2 manual check: two real turns, cache read > 0) waits for an Anthropic API key; the owner has none yet and only a free Gemini key. Run `pytest -m live -n 0 tests/test_llm.py` with `ANTHROPIC_API_KEY` set (about $0.01-0.02) before the first paying client goes live on Claude. The live Gemini check (P4.2b: one real reply with the free key, `pytest -m live -n 0 -s tests/test_llm.py -k gemini`) is also deferred: owner will add the key later; run it before the demo chat (P4.5) is signed off.
 - **O-015** The AI can't see which events exist: `register_event` needs an event id, but event ids come from the database and the knowledge is fixed text. Fix before events go live: put the upcoming events (id, title, time) in the per-turn context block, or add a `list_events` tool. Until then the demo has no events.
 - **O-016** ~~Development database~~ **Resolved 2026-09-28:** role and database `chatbot` created by the owner, `.env` line fixed; the demo chat runs against it. Was: the owner's development database isn't set up: `.env` has `DATABASE_URL` for a user `chatbot` that PostgreSQL rejects (tests use the separate `chatbot_test` role, so they're unaffected). Create the role and database (steps given in the P4.5 report) before running `python -m app.chat` against it.
+- **O-017** Behind Railway/Cloudflare every request comes from the proxy's address, so the per-IP limit would count everyone together. At deploy, run uvicorn with `--proxy-headers --forwarded-allow-ips` set to the proxy's addresses only (never `*` on a public port), so `request.client.host` is the visitor's real address and can't be faked.
 - **O-013** `estimate_tokens` is a byte-based estimate (marked `ponytail:` in `app/knowledge.py`). Replace with the provider's token-count call when the AI client exists (P3).
 - **O-009** Windows console encoding (cp1252) can't print Bangla when output is redirected. When structured logging is built (P7.2), write logs as UTF-8 explicitly (e.g. `sys.stdout.reconfigure(encoding="utf-8")` or `PYTHONUTF8=1` in the service settings) and test a Bangla log line.
 - **O-010** `packs/study_abroad/prompt.md` and `knowledge_template.md` are now the source of truth; PRD Appendix A/B are copies. Change the pack files first and keep the PRD in step (or replace the appendices with pointers). The Docker image must include `packs/` (P7.2).

@@ -33,7 +33,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["app"]
+packages = ["app", "app.channels"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

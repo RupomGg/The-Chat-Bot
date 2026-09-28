@@ -13,7 +13,13 @@ from cryptography.fernet import Fernet
 
 ENVS = ("test", "staging", "production")
 REQUIRED = ("ENV", "DATABASE_URL", "FERNET_KEY", "SESSION_SECRET", "PUBLIC_BASE_URL")
-SECRET_FIELDS = ("database_url", "fernet_key", "session_secret")
+SECRET_FIELDS = (
+    "database_url",
+    "fernet_key",
+    "session_secret",
+    "anthropic_api_key",
+    "gemini_api_key",
+)
 MIN_SESSION_SECRET = 32
 
 
@@ -28,6 +34,8 @@ class Config:
     fernet_key: str
     session_secret: str
     public_base_url: str
+    anthropic_api_key: str = ""
+    gemini_api_key: str = ""
 
     def __repr__(self) -> str:
         parts = []
@@ -97,4 +105,6 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
         fernet_key=values["FERNET_KEY"],
         session_secret=secret,
         public_base_url=base_url,
+        anthropic_api_key=source.get("ANTHROPIC_API_KEY", "").strip(),
+        gemini_api_key=source.get("GEMINI_API_KEY", "").strip(),
     )
