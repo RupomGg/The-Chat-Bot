@@ -331,7 +331,12 @@ class Engine:
             country=tenant["country"],
             pause_hours=tenant["pause_hours"],
         )
-        client = self.clients["gemini" if tenant["model"].startswith("gemini-") else "claude"]
+        provider = "gemini" if tenant["model"].startswith("gemini-") else "claude"
+        if provider not in self.clients:  # no key set for this company's AI: tell the operator
+            turn.error = f"no {provider} key"
+            outcome = llm.Outcome("fallback", action="alert", error=turn.error)
+            return self._finish(conn, tenant, contact, conversation, outcome, [], now), turn
+        client = self.clients[provider]
         effects = []
         for _ in range(MAX_TOOL_ROUNDS + 1):
             started = time.monotonic()

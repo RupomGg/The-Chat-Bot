@@ -30,10 +30,14 @@ dev = [
     "hypothesis==6.168.0",
     "httpx==0.28.1",
     "pyyaml==6.0.3",
+    "playwright==1.63.0",  # widget tests in a real Chromium (P5.2); browser: playwright install
 ]
 
 [tool.setuptools]
 packages = ["app", "app.channels"]
+
+[tool.setuptools.package-data]
+app = ["static/*"]  # widget.js, demo.html
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

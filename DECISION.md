@@ -231,13 +231,24 @@ Every decision and every file created, changed or deleted is recorded here, newe
 
 ### D-022 Website chat API: allowed websites, limits and reply format
 - Date: 2026-09-28
-- Status: **proposed** (P5.1; owner confirms with the portion sign-off)
+- Status: **accepted** 2026-10-02 (P5.1 signed off by the owner after CI #12 was green)
 - Allowed websites: each company lists exact origins (`https://site.com`) or subdomain rules (`https://*.site.com`, which don't cover the bare domain). Everything else is refused, including `null` (local files, sandboxed frames), a missing Origin, another port or scheme, and lookalikes. Origin checks only stop other websites' pages; scripts can fake Origin, which is what the limits are for.
 - Limits: 10 messages a minute per visitor (F8) and 30 a minute per IP address (several students may share an office or phone network), each per company, answered with 429 and Retry-After. Kept in each web process's memory: with N processes each allows the limit; Cloudflare also limits `/api/chat` (PRD §12). Move to the database if that matters.
 - Reply format: one SSE `reply` event `{text, buttons, after}`. The engine works out and stores the reply before the first byte is sent, so a visitor who leaves mid-reply loses nothing; `after` is the id to poll from. Token-by-token streaming isn't needed for 1-4 sentence replies and can be added later as extra events.
 - Visitor ids: 16-64 random characters from the widget. Anyone with the id can read that chat by polling, so the widget must make it random (P5.2).
 - AI keys: `ANTHROPIC_API_KEY` and `GEMINI_API_KEY` are optional settings; the app sets up only the AIs that have a key.
 - Affects: `app/channels/web.py`, `app/main.py`, `app/config.py`, `.env.example`, `pyproject.toml`.
+
+### D-023 Website widget: real-browser tests, our own pages, labels and settings
+- Date: 2026-10-02
+- Status: **accepted** (owner chose "Real browser" when asked how to test the widget; the rest confirmed with the P5.2 sign-off)
+- Tests: Playwright drives a real Chromium against a live test server, on a made-up customer site with hostile CSS (dev dependency `playwright==1.63.0`; CI installs Chromium, about 2-3 minutes more per OS; CI job limit 20 → 30 minutes). Python coverage stays the gate for `app/`; the widget's JavaScript is held to the same standard by mutation checks. The test browser turns off Chrome's local-network blocking, because in tests the "customer site" is public and our server is this computer; live, both are public.
+- Our own pages: `/demo` (and later the admin test chat) may use the chat API without being on the company's list: a request is ours when its Origin is this server's own address, or when it has no Origin and the browser says `Sec-Fetch-Site: same-origin` (browsers leave Origin off same-site GETs). A script outside a browser can fake both, but it can fake any Origin anyway (D-022).
+- Refusals (403, 404) carry `Access-Control-Allow-Origin: *`: they hold no data, and otherwise a widget on a site that isn't allowed can't read the refusal, takes it for a network drop and retries forever.
+- Button labels: a quick answer's first trigger phrase, capitalised, at most 20 characters ("Fees", "Address"); a code with no quick answer shows the code ("Talk to us"). No label column until an admin needs a label that isn't a trigger.
+- Widget settings (`tenants.widget_theme`, optional): `color` (#rrggbb), `greeting` (≤ 300 characters), `chips` (button codes, ≤ 4; default: the first active quick answers), `privacy_url` (https), `whatsapp` (wa.me number), `messenger` (m.me username). Anything invalid falls back to the default, so a typo can't break or inject into a customer's page.
+- A company whose AI has no key set gets the fallback reply and an operator alert, not a crash (found while planning the demo: the owner's `.env` has no AI key).
+- Affects: `app/channels/web.py`, `app/static/widget.js`, `app/static/demo.html`, `app/engine.py`, `pyproject.toml`, `.github/workflows/ci.yml`.
 
 ---
 
@@ -1023,7 +1034,34 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - Gate result (full logs saved): G4 ruff check exit 0, format exit 0 (61 files), invisible-character scan clean, no backslashes in new code; G1 1856 passed (5:11); G2/G3 `app/channels/web.py` 135 / 52, `app/main.py` 35 / 4, `app/config.py` 63 / 18, all 100%, TOTAL 2414 / 872 **100%**; G6 1856 passed (4:58); G7 1856 x3 (4:52, 4:52, 4:48); no warnings or errors in logs; no file changed; 0 leftover databases.
 - Manual check: none yet; the widget (P5.2) is the first real browser client.
 - `# pragma: no cover` uses: none
-- Owner sign-off: pending (after CI is green)
+- Owner sign-off: **signed off** 2026-10-02 (pushed in 11ee3d1, CI #12 green on Windows, Linux, macOS)
+
+### C-036 Portion P5.2: Website chat widget
+- Date: 2026-10-02
+- New files:
+  - `app/static/widget.js`: the widget (plain JavaScript, no build step), 12.9 KB, **4.9 KB gzipped** (limit 15 KB). One tag on the customer's site; Shadow DOM plus an inline `!important` reset on its own element, so the site's CSS can't change it; server text only ever set as text, never HTML; visitor id from `crypto.getRandomValues` (works on plain-http phones), kept in localStorage when allowed, otherwise for the visit only; greeting, privacy line with link, buttons, "Continue on WhatsApp/Messenger"; Enter sends, Shift+Enter is a new line, Enter while a Bangla/phone keyboard is still picking a word doesn't send; network drop or server error → "Reconnecting..." and retries with waits of 1, 2, 4 … 30 s (every waiting retry at once when the browser is back online; one poll at a time), the same message id each time so it's answered once; "too many messages" waits the server's Retry-After; history reloads after a page reload; counsellor replies appear by polling every 4 s while open; keyboard (Tab, Enter, Esc returns focus) and screen-reader roles; full screen on phones, kept above the on-screen keyboard.
+  - `app/static/demo.html`: a deliberately messy page at `/demo` to try the widget on, here and on phones.
+  - `tests/test_widget.py`: 32 real-browser tests.
+- Changed files:
+  - `app/channels/web.py`: `GET /api/widget-config/{slug}`, `GET /widget.js` (cached 5 minutes), `GET /demo`; button labels in replies (`{code, label}`); our own pages allowed; refusals readable by any site; `Retry-After` exposed to other sites' scripts (browsers hide it otherwise).
+  - `app/engine.py`: no key for the company's AI → fallback reply + operator alert.
+  - `pyproject.toml`: `playwright` dev dependency; `app/static/*` shipped with the package.
+  - `.github/workflows/ci.yml`: installs Chromium; job limit 30 minutes.
+  - `tests/test_web.py` (+30: widget settings, labels, our own pages, the script and demo page, size limit), `tests/test_engine.py` (+2: no AI key).
+- Deleted files: none
+- Found:
+  1. **A widget on a site that isn't allowed would retry forever** (the browser hid the 403, so it looked like a network drop); refusals are now readable. Found by the first browser run.
+  2. **A reply lost on the way back was never shown**: the resend is answered "already done" with no text, and the widget skipped past the stored reply. Now it fetches it at once. Found by the first browser run.
+  3. **A company with no AI key crashed the request** (500), which the widget would retry forever; now the fallback reply and an alert.
+  4. Browsers hide `Retry-After` from other sites' scripts unless the server exposes it; exposed.
+  5. Mutation checks: server 19/19; widget 29/36 at first: two weak tests (a lost reply was counted, not read, nor timed; a late poll answering after a send never happened in any test) now strengthened or added; one guard that duplicated another removed; `:host { all: initial }` removed (the element's inline reset already does it); 4/4 on rerun; engine 2/2. One mutant is left on purpose: keeping the panel above a phone's on-screen keyboard, which headless Chrome can't show; it's in the device check.
+  6. One test was flaky on its first stable run (counted a config request from the page's first load); fixed and checked 3 times in a row.
+  7. **The full gate caught a timing bug** (1 failure in 2 of 5 runs): the widget could wake only one waiting retry when the network came back, so if the 4 s poll was also retrying, the message sat out its whole wait (up to 30 s in real use); and while offline a new poll loop started every 4 s on top of the ones still retrying (about 75 after 5 minutes, all firing at once on reconnect). Proved the browser delivers the online event every time (120 of 120), so the bug was ours. Now every waiting retry wakes, and one poll runs at a time; the test now needs both the message and the poll to retry at once (either half of the old bug put back fails it), plus a test that polls don't pile up offline. Gate rerun from the start.
+  8. O-018 (the privacy page the widget links to).
+- Gate result (full logs saved): G4 ruff check exit 0, format exit 0 (62 files), invisible-character scan clean (incl. `app/static`), no backslashes in new code; G1 1920 passed (5:32); G2/G3 `app/channels/web.py` 178 / 58, `app/engine.py` 241 / 68, all 100%, TOTAL 2462 / 880 **100%**; G6 1920 passed (4:53); G7 1920 x3 (4:08, 4:58, 6:05); no file changed; 0 leftover databases. (The first full gate run failed: 1 test in 2 of 5 runs, see Found 7; fixed and rerun from the start.)
+- Manual check: screenshots of `/demo` on desktop and a 360 px phone against the owner's development database (English and Bangla quick answers, the hostile page's CSS not reaching the widget); a question with no AI key gave the fallback reply. **Still open (G8):** the owner's device check on a real Android phone (Chrome) and iPhone (Safari), plus desktop Chrome, Edge, Firefox and Safari: open, type Bangla and English with the phone keyboard, send, reply, rotate, the on-screen keyboard doesn't cover the input box, close/reopen keeps the conversation.
+- `# pragma: no cover` uses: none
+- Owner sign-off: pending (after CI is green and the device check)
 
 ### Existing files at the start of the log
 - `PRD.md` (v2.1): product requirements. Source of truth for *what* to build.
@@ -1043,6 +1081,7 @@ Every decision and every file created, changed or deleted is recorded here, newe
 - **O-015** The AI can't see which events exist: `register_event` needs an event id, but event ids come from the database and the knowledge is fixed text. Fix before events go live: put the upcoming events (id, title, time) in the per-turn context block, or add a `list_events` tool. Until then the demo has no events.
 - **O-016** ~~Development database~~ **Resolved 2026-09-28:** role and database `chatbot` created by the owner, `.env` line fixed; the demo chat runs against it. Was: the owner's development database isn't set up: `.env` has `DATABASE_URL` for a user `chatbot` that PostgreSQL rejects (tests use the separate `chatbot_test` role, so they're unaffected). Create the role and database (steps given in the P4.5 report) before running `python -m app.chat` against it.
 - **O-017** Behind Railway/Cloudflare every request comes from the proxy's address, so the per-IP limit would count everyone together. At deploy, run uvicorn with `--proxy-headers --forwarded-allow-ips` set to the proxy's addresses only (never `*` on a public port), so `request.client.host` is the visitor's real address and can't be faked.
+- **O-018** The widget's privacy line links to `PUBLIC_BASE_URL/privacy` (or the company's own `privacy_url`), but that page doesn't exist yet. Build `/privacy` with P5.3 (PRD §12 lists its contents) before any real customer's site uses the widget.
 - **O-013** `estimate_tokens` is a byte-based estimate (marked `ponytail:` in `app/knowledge.py`). Replace with the provider's token-count call when the AI client exists (P3).
 - **O-009** Windows console encoding (cp1252) can't print Bangla when output is redirected. When structured logging is built (P7.2), write logs as UTF-8 explicitly (e.g. `sys.stdout.reconfigure(encoding="utf-8")` or `PYTHONUTF8=1` in the service settings) and test a Bangla log line.
 - **O-010** `packs/study_abroad/prompt.md` and `knowledge_template.md` are now the source of truth; PRD Appendix A/B are copies. Change the pack files first and keep the PRD in step (or replace the appendices with pointers). The Docker image must include `packs/` (P7.2).

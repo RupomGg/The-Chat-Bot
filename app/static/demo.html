@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat widget demo</title>
+<style>
+  /* A deliberately messy website: none of this may change the chat widget (Shadow DOM). */
+  body { font: 40px/1 "Comic Sans MS", cursive; color: red; background: #fffbe6; margin: 0; padding: 24px; }
+  div, button, textarea, p, a, span, header, form { color: red !important; font-size: 40px !important;
+    border: 3px dashed red !important; background: yellow !important; }
+  body > * { opacity: .9 !important; }
+  * { letter-spacing: 3px; }
+</style>
+</head>
+<body>
+<h1>Demo Consultancy</h1>
+<p>Made-up sample website for trying the chat widget. The chat button is at the bottom right.</p>
+<script src="/widget.js" data-company="demo" async></script>
+</body>
+</html>

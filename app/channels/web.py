@@ -3,10 +3,13 @@
     POST    /api/chat/{slug}       {"visitor", "text" | "payload", "id"?} -> one SSE "reply" event
     OPTIONS /api/chat/{slug}       the browser's permission check before the POST
     GET     /api/chat/{slug}/poll  ?visitor=…&after=ID -> newer messages (staff replies, history)
+    GET     /api/widget-config/{slug}  name, colour, greeting, buttons, privacy link (P5.2)
+    GET     /widget.js, /demo          the widget script, and a page to try it on (P5.2)
 
 Only pages on the company's allowed origins may call it (browsers send Origin; a sandboxed
 page or a local file sends "null", which is refused). Allowed origins are exact
 ("https://example.com") or cover subdomains ("https://*.example.com", not the bare domain).
+Our own pages (the demo) may always use it.
 
 The reply is worked out and stored before the first byte is sent, so a visitor who closes
 the page mid-reply loses nothing: the reply is there on the next poll.
@@ -16,14 +19,16 @@ import collections
 import datetime
 import json
 import math
+import pathlib
 import re
 import time
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
+from app.contact_details import normalize_https_url
 from app.engine import Inbound
 
 MAX_TEXT = 1000  # F8: same cap as the AI prompt (MAX_STUDENT_CHARS)
@@ -34,6 +39,15 @@ FIELDS = {"visitor", "text", "payload", "id"}
 PER_VISITOR = 10  # messages a minute (F8)
 PER_IP = 30  # a minute: several students may share one office or phone network
 POLL_LIMIT = 50
+STATIC = pathlib.Path(__file__).resolve().parent.parent / "static"
+COLOR = re.compile(r"#[0-9a-fA-F]{6}")
+WHATSAPP = re.compile(r"[1-9][0-9]{7,14}")  # wa.me number: country code, no +
+MESSENGER = re.compile(r"[A-Za-z0-9.]{5,50}")  # m.me page username
+MAX_GREETING = 300
+MAX_CHIPS = 4
+# Refusals are readable by any website (they carry no data), so a widget on a site that isn't
+# allowed sees "403" and stops, instead of taking it for a network drop and retrying forever.
+REFUSED = {"Access-Control-Allow-Origin": "*"}
 
 router = APIRouter()
 
@@ -86,10 +100,11 @@ def origin_allowed(origin: str | None, allowed: list[str]) -> bool:
 
 
 def _company(request: Request, slug: str):
-    """(tenant id, web channel id, allowed origins), or None if there's no live web chat."""
+    """(tenant id, web channel id, allowed origins, name, widget theme), or None if there's
+    no live web chat."""
     with request.app.state.pool.connection() as conn:
         return conn.execute(
-            "SELECT t.id, ch.id, t.allowed_origins FROM tenants t"
+            "SELECT t.id, ch.id, t.allowed_origins, t.name, t.widget_theme FROM tenants t"
             " JOIN channels ch ON ch.tenant_id = t.id AND ch.type = 'web' AND ch.active"
             " WHERE t.slug = %s AND t.active",
             (slug,),
@@ -100,6 +115,11 @@ def _cors(origin: str) -> dict:
     return {"Access-Control-Allow-Origin": origin, "Vary": "Origin"}
 
 
+def _retry(wait: int) -> dict:
+    # Exposed, or the widget on another website couldn't read it (CORS hides most headers).
+    return {"Retry-After": str(wait), "Access-Control-Expose-Headers": "Retry-After"}
+
+
 def _error(status: int, message: str, headers: dict | None = None) -> JSONResponse:
     return JSONResponse({"error": message}, status_code=status, headers=headers)
 
@@ -108,10 +128,13 @@ def _check(request: Request, slug: str):
     """(company, CORS headers, None), or (None, None, the error response)."""
     company = _company(request, slug)
     if company is None:
-        return None, None, _error(404, "no chat here")
+        return None, None, _error(404, "no chat here", REFUSED)
     origin = request.headers.get("origin")
-    if not origin_allowed(origin, company[2]):
-        return None, None, _error(403, "this website may not use this chat")
+    if origin is None and request.headers.get("sec-fetch-site") == "same-origin":
+        return company, {}, None  # our own page: browsers leave Origin off same-site GETs
+    own = str(request.base_url).rstrip("/")
+    if origin != own and not origin_allowed(origin, company[2]):
+        return None, None, _error(403, "this website may not use this chat", REFUSED)
     return company, _cors(origin), None
 
 
@@ -166,7 +189,7 @@ async def chat(slug: str, request: Request):
     state = request.app.state
     ip = getattr(request.client, "host", "unknown")  # no client address on a Unix socket
     if wait := state.per_ip.wait((slug, ip)):
-        return _error(429, "too many messages, wait a moment", headers | {"Retry-After": str(wait)})
+        return _error(429, "too many messages, wait a moment", headers | _retry(wait))
     try:
         data = json.loads(await request.body())
     except ValueError:  # includes bad UTF-8
@@ -174,7 +197,7 @@ async def chat(slug: str, request: Request):
     if problem := _message(data):
         return _error(400, problem, headers)
     if wait := state.per_visitor.wait((slug, data["visitor"])):
-        return _error(429, "too many messages, wait a moment", headers | {"Retry-After": str(wait)})
+        return _error(429, "too many messages, wait a moment", headers | _retry(wait))
 
     event = await run_in_threadpool(_reply, state, company, data)
     frame = "event: reply" + chr(10) + "data: " + json.dumps(event, ensure_ascii=False)
@@ -187,7 +210,7 @@ async def chat(slug: str, request: Request):
 
 def _reply(state, company, data) -> dict:
     """Runs the engine; the reply is stored when this returns."""
-    tenant_id, channel_id, _ = company
+    tenant_id, channel_id = company[:2]
     now = datetime.datetime.now(datetime.UTC)
     msg = Inbound(
         tenant_id,
@@ -201,9 +224,25 @@ def _reply(state, company, data) -> dict:
     with state.pool.connection() as conn:
         reply = state.engine.handle(conn, msg, now=now)
         after = _latest_id(conn, channel_id, data["visitor"])
+        buttons = _buttons(conn, tenant_id, reply.buttons)
     # ponytail: the whole reply in one event (replies are 1-4 sentences); token streaming
     # can add "delta" events later without changing this format.
-    return {"text": reply.text, "buttons": list(reply.buttons), "after": after}
+    return {"text": reply.text, "buttons": buttons, "after": after}
+
+
+def _buttons(conn, tenant_id: int, codes) -> list[dict]:
+    """Codes with a label to show: the quick answer's first trigger phrase ("Fees").
+
+    ponytail: no label column yet; add one when an admin needs a label that isn't a trigger
+    (Messenger and WhatsApp button titles may want it, P5.3-P5.4).
+    """
+    rows = conn.execute(
+        "SELECT code, triggers[1] FROM quick_answers WHERE tenant_id = %s AND code = ANY(%s)",
+        (tenant_id, list(codes)),
+    ).fetchall()
+    first = {code: trigger for code, trigger in rows if trigger}
+    labels = {code: first.get(code, code.replace("_", " ").lower()) for code in codes}
+    return [{"code": code, "label": labels[code][:20].capitalize()} for code in codes]
 
 
 @router.get("/api/chat/{slug}/poll")
@@ -224,3 +263,57 @@ def poll(slug: str, request: Request, visitor: str = "", after: int = 0):
         ).fetchall()
     messages = [{"id": i, "role": role, "text": text} for i, role, text in rows]
     return JSONResponse({"messages": messages}, headers=headers | {"Cache-Control": "no-store"})
+
+
+def _valid(value, pattern: re.Pattern) -> str | None:
+    """A theme value only if it's safe to put in the page (bad ones fall back to defaults)."""
+    return value if isinstance(value, str) and pattern.fullmatch(value) else None
+
+
+@router.get("/api/widget-config/{slug}")
+def widget_config(slug: str, request: Request):
+    company, headers, error = _check(request, slug)
+    if error:
+        return error
+    tenant_id, _, _, name, theme = company
+    greeting = theme.get("greeting")
+    chips = theme.get("chips")
+    with request.app.state.pool.connection() as conn:
+        if not isinstance(chips, list):  # default: the company's first quick answers
+            chips = [
+                code
+                for (code,) in conn.execute(
+                    "SELECT code FROM quick_answers WHERE tenant_id = %s AND active ORDER BY id",
+                    (tenant_id,),
+                )
+            ]
+        chips = [c for c in chips if isinstance(c, str) and PAYLOAD.fullmatch(c)][:MAX_CHIPS]
+        buttons = _buttons(conn, tenant_id, chips)
+    config = {
+        "name": name,
+        "color": _valid(theme.get("color"), COLOR) or "#0f766e",
+        "greeting": greeting
+        if isinstance(greeting, str) and 0 < len(greeting.strip()) <= MAX_GREETING
+        else "Hi! How can we help you today?",
+        "buttons": buttons,
+        "privacy_url": normalize_https_url(theme.get("privacy_url"))
+        or request.app.state.config.public_base_url + "/privacy",
+        "whatsapp": _valid(theme.get("whatsapp"), WHATSAPP),
+        "messenger": _valid(theme.get("messenger"), MESSENGER),
+    }
+    return JSONResponse(config, headers=headers | {"Cache-Control": "no-store"})
+
+
+@router.get("/widget.js")
+def widget_js():
+    return FileResponse(
+        STATIC / "widget.js",
+        media_type="text/javascript; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=300"},  # a fix reaches every site in 5 min
+    )
+
+
+@router.get("/demo")
+def demo_page():
+    """A page to try the widget on, here and on phones (the P5.2 device check)."""
+    return FileResponse(STATIC / "demo.html", media_type="text/html; charset=utf-8")

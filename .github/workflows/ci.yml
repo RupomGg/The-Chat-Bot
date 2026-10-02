@@ -21,7 +21,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 30  # three full test runs, now with browser tests (P5.2)
 
     defaults:
       run:
@@ -54,6 +54,10 @@ jobs:
 
       - name: Install
         run: python -m pip install -e ".[dev]"
+
+      # Chromium for the widget tests (P5.2); --with-deps adds its system libraries on Linux.
+      - name: Install test browser
+        run: python -m playwright install --with-deps chromium
 
       - name: G4 lint
         run: python -m ruff check .

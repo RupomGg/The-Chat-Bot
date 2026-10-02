@@ -258,6 +258,19 @@ def test_ai_failure_still_answers_the_customer(world, error, alert):
     assert "handoff" in world.notices
 
 
+@pytest.mark.parametrize("model", ["claude-haiku-4-5", "gemini-3.5-flash"])
+def test_no_key_for_the_companys_ai_still_answers(world, model):
+    world.conn.execute("UPDATE tenants SET model = %s", (model,))
+    msg = Inbound(world.tenant, world.channel, "u1", NOW, text="hello")
+    engine = Engine({}, notify=lambda k, d: world.notices.append(k))  # no AI keys set
+    reply = engine.handle(world.conn, msg, now=NOW)
+    assert (reply.text, reply.source) == (FALLBACK, "fallback")  # not a crash
+    assert "alert" in world.notices  # the operator learns a key is missing
+    provider = model.split("-")[0]
+    assert world.turns()[-1][-1] == f"no {provider} key"
+    assert world.messages()[-1] == ("bot", FALLBACK)
+
+
 def test_refusal_hands_over(world):
     refused = SimpleNamespace(
         content=[], stop_reason="refusal", usage=SimpleNamespace(input_tokens=5, output_tokens=0)
