@@ -36,3 +36,7 @@ htmlcov/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Business documents: kept on this computer, not in the public repo (owner, 2026-10-07)
+PRD.md
+DECISION.md
