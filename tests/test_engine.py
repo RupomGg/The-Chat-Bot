@@ -243,19 +243,22 @@ def test_no_knowledge_means_a_person_answers(world):
 # ---------- failures ----------
 
 
-@pytest.mark.parametrize(
-    "error, alert",
-    [
-        (api_error(anthropic.RateLimitError, 429), False),
-        (api_error(anthropic.AuthenticationError, 401), True),
-    ],
-)
-def test_ai_failure_still_answers_the_customer(world, error, alert):
-    reply = world.send("hello", ai=FakeAI(error))
+def test_a_passing_ai_failure_hands_over(world):
+    reply = world.send("hello", ai=FakeAI(api_error(anthropic.RateLimitError, 429)))
     assert (reply.text, reply.source) == (FALLBACK, "fallback")
-    assert world.conversation()[1] == "human"
-    assert ("alert" in world.notices) is alert
-    assert "handoff" in world.notices
+    assert world.conversation()[1] == "human"  # a person answers this one
+    assert "handoff" in world.notices and "alert" not in world.notices
+
+
+def test_a_rejected_key_keeps_the_bot_on(world):
+    # Every chat would fail until the key is fixed: answer from quick answers instead of
+    # handing each chat over to sit quiet for a day (owner, 2026-10-07).
+    reply = world.send("hello", ai=FakeAI(api_error(anthropic.AuthenticationError, 401)))
+    assert (reply.text, reply.source, reply.buttons) == (FALLBACK, "fallback", ("FEES",))
+    assert world.conversation()[1] == "bot"
+    assert world.notices == ["alert"]  # the operator is told; no hand-over
+    assert world.events("unanswered")[-1][0]["reason"] == "ai_unavailable"  # staff can see it
+    assert world.send("fees", at=NOW + datetime.timedelta(minutes=1)).text == "Counselling is free."
 
 
 @pytest.mark.parametrize("model", ["claude-haiku-4-5", "gemini-3.5-flash"])
@@ -269,6 +272,7 @@ def test_no_key_for_the_companys_ai_still_answers(world, model):
     provider = model.split("-")[0]
     assert world.turns()[-1][-1] == f"no {provider} key"
     assert world.messages()[-1] == ("bot", FALLBACK)
+    assert world.conversation()[1] == "bot"  # still on: quick answers keep working
 
 
 def test_refusal_hands_over(world):
@@ -428,7 +432,7 @@ def test_blocked_input_never_reaches_the_ai(world):
 
 def test_code_in_the_ai_reply_is_never_sent(world):
     code = "Sure:" + chr(10) + "```" + chr(10) + "print(1)" + chr(10) + "```"
-    reply = world.send("what are the fees", ai=FakeAI(text(code)))
+    reply = world.send("what are the fees for Canada", ai=FakeAI(text(code)))
     assert "print" not in reply.text and "only help" in reply.text
     assert world.events("off_topic_blocked") == [({"reason": "code"},)]
     assert world.conversation()[2] == 1

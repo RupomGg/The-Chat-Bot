@@ -200,10 +200,35 @@ def test_misuse_is_redirected_with_buttons(web):
     ]
 
 
+def test_a_handed_over_chat_is_marked_waiting(web):
+    assert event(say(web, "fees"))["waiting"] is False
+    with psycopg.connect(web.db, autocommit=True) as conn:
+        conn.execute(
+            "UPDATE conversations SET state = 'human', paused_until = now() + interval '1 day'"
+        )
+    reply = event(say(web, "fees"))
+    assert reply["text"] is None and reply["waiting"] is True
+
+
+def test_with_no_ai_key_ready_answers_keep_working(migrated_db_url):
+    # the owner's phone check: with no AI key the bot went quiet after the first question
+    with psycopg.connect(migrated_db_url, autocommit=True) as conn:
+        seed(conn)
+    app = main.create_app(load_config(env(migrated_db_url)))  # no AI keys at all
+    with TestClient(app, headers={"Origin": "http://testserver"}) as client:
+        replies = [event(say(client, text)) for text in ("Can I study in Canada?", "fees", "book")]
+    assert replies[0]["text"].startswith("Thanks! A counsellor will reply here soon.")
+    assert [b["code"] for b in replies[0]["buttons"]] == ["FEES", "OFFICE", "BOOK"]
+    assert replies[1]["text"].startswith("Counselling is free.")  # still answered
+    assert replies[2]["text"].startswith("Thanks!")  # booking needs the AI: the fallback again
+    assert not any(r["waiting"] for r in replies)  # never handed over and silent
+
+
 def test_a_resent_message_is_answered_once(web):
     assert event(say(web, "fees", id="m-1"))["text"]
     again = event(say(web, "fees", id="m-1"))  # the widget retried after a dropped connection
     assert again["text"] is None
+    assert again["waiting"] is False  # already answered: not "a counsellor has this chat"
     assert rows(web, "SELECT count(*) FROM messages")[0][0] == 2
 
 
@@ -280,12 +305,16 @@ def test_the_longest_message_is_accepted(web):
 def test_other_websites_are_refused(web, origin):
     headers = {"Origin": origin} if origin else {}
     web.headers.pop("Origin")
-    for response in (
+    requests = [
         web.post(URL, json={"visitor": VISITOR, "text": "hi"}, headers=headers),
-        web.get(f"{URL}/poll", params={"visitor": VISITOR}, headers=headers),
         web.options(URL, headers=headers),
-        web.get(CONFIG, headers=headers),
-    ):
+    ]
+    if origin:  # a GET without Origin is our own page (test_our_own_page_may_chat)
+        requests += [
+            web.get(f"{URL}/poll", params={"visitor": VISITOR}, headers=headers),
+            web.get(CONFIG, headers=headers),
+        ]
+    for response in requests:
         assert response.status_code == 403
         assert response.json() == {"error": "this website may not use this chat"}
         # readable by any site (so the widget stops), but only a refusal: nothing else in it
@@ -405,6 +434,32 @@ def test_poll_after_the_last_reply_shows_only_newer_messages(web):
     ]
 
 
+def test_poll_shows_a_tap_as_its_button_label(web):
+    say(web, payload="OFFICE")
+    for typed in ("[button FEES] is what I typed", "[button FEES!", "[button not a code]"):
+        say(web, typed)  # typed text that only looks like a tap
+    with psycopg.connect(web.db, autocommit=True) as conn:  # a tap on a button since removed
+        conn.execute("DELETE FROM quick_answers WHERE code = 'BOOK'")
+    say(web, payload="BOOK")
+    with psycopg.connect(web.db, autocommit=True) as conn:  # only the visitor's own taps
+        conn.execute(
+            "INSERT INTO messages (tenant_id, conversation_id, role, content)"
+            " SELECT tenant_id, id, 'staff', '[button OFFICE]' FROM conversations"
+        )
+    texts = [(m["role"], m["text"]) for m in poll(web).json()["messages"] if m["role"] != "bot"]
+    assert texts == [
+        ("student", "Address"),
+        ("student", "[button FEES] is what I typed"),
+        ("student", "[button FEES!"),
+        ("student", "[button not a code]"),
+        ("student", "Book"),
+        ("staff", "[button OFFICE]"),  # a code the visitor did tap
+    ]
+    with psycopg.connect(web.db) as conn:  # stored unchanged, for staff and the AI
+        stored = conn.execute("SELECT content FROM messages WHERE role = 'student' ORDER BY id")
+        assert [c for (c,) in stored][0] == "[button OFFICE]"
+
+
 def test_poll_shows_only_your_own_chat(web):
     say(web, "fees")
     assert poll(web, visitor="w" * 16).json() == {"messages": []}
@@ -453,18 +508,19 @@ def test_our_own_page_may_chat(web):
     web.headers.pop("Origin")
     own = {"Origin": "http://testserver"}  # the page's address is this server's address
     assert web.post(URL, json={"visitor": VISITOR, "text": "fees"}, headers=own).status_code == 200
-    same_site = {"Sec-Fetch-Site": "same-origin"}  # browsers leave Origin off same-site GETs
-    response = web.get(f"{URL}/poll", params={"visitor": VISITOR}, headers=same_site)
+    # browsers leave Origin off same-origin GETs, and on plain http (the demo on a phone)
+    # send no Sec-Fetch-Site either: found on the owner's phone
+    response = web.get(f"{URL}/poll", params={"visitor": VISITOR})
     assert response.status_code == 200
     assert "access-control-allow-origin" not in response.headers  # nothing to share
     assert len(response.json()["messages"]) == 2
+    assert web.get(CONFIG).status_code == 200
 
 
-@pytest.mark.parametrize("fetch_site", [None, "cross-site", "same-site", "none"])
-def test_no_origin_is_refused_unless_same_origin(web, fetch_site):
+def test_sending_without_origin_is_refused(web):
     web.headers.pop("Origin")
-    headers = {"Sec-Fetch-Site": fetch_site} if fetch_site else {}
-    assert web.get(f"{URL}/poll", params={"visitor": VISITOR}, headers=headers).status_code == 403
+    assert web.post(URL, json={"visitor": VISITOR, "text": "hi"}).status_code == 403
+    assert web.options(URL).status_code == 403
 
 
 def test_another_port_on_our_host_is_not_our_page(web):

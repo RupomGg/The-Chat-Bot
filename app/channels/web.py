@@ -130,8 +130,11 @@ def _check(request: Request, slug: str):
     if company is None:
         return None, None, _error(404, "no chat here", REFUSED)
     origin = request.headers.get("origin")
-    if origin is None and request.headers.get("sec-fetch-site") == "same-origin":
-        return company, {}, None  # our own page: browsers leave Origin off same-site GETs
+    if origin is None and request.method == "GET":
+        # Our own page: browsers leave Origin off same-origin GETs (and Sec-Fetch-Site too, on
+        # plain http, e.g. the demo on a phone). Another site's script always sends Origin, and
+        # a GET changes nothing, so allowing it costs nothing a faked Origin couldn't get.
+        return company, {}, None
     own = str(request.base_url).rstrip("/")
     if origin != own and not origin_allowed(origin, company[2]):
         return None, None, _error(403, "this website may not use this chat", REFUSED)
@@ -227,7 +230,9 @@ def _reply(state, company, data) -> dict:
         buttons = _buttons(conn, tenant_id, reply.buttons)
     # ponytail: the whole reply in one event (replies are 1-4 sentences); token streaming
     # can add "delta" events later without changing this format.
-    return {"text": reply.text, "buttons": buttons, "after": after}
+    # waiting: a person has this chat, so the bot stays quiet; the widget says so once.
+    waiting = reply.source == "silent"
+    return {"text": reply.text, "buttons": buttons, "after": after, "waiting": waiting}
 
 
 def _buttons(conn, tenant_id: int, codes) -> list[dict]:
@@ -261,8 +266,20 @@ def poll(slug: str, request: Request, visitor: str = "", after: int = 0):
             " AND m.role IN ('student', 'bot', 'staff') ORDER BY m.id LIMIT %s",
             (company[1], visitor, after, POLL_LIMIT),
         ).fetchall()
-    messages = [{"id": i, "role": role, "text": text} for i, role, text in rows]
+        # A tap is stored as "[button FEES]"; the visitor saw the button's label, so show that.
+        taps = {_tap(text) for _, role, text in rows if role == "student"} - {None}
+        labels = {b["code"]: b["label"] for b in _buttons(conn, company[0], sorted(taps))}
+    messages = [
+        {"id": i, "role": role, "text": labels.get(_tap(text) if role == "student" else None, text)}
+        for i, role, text in rows
+    ]
     return JSONResponse({"messages": messages}, headers=headers | {"Cache-Control": "no-store"})
+
+
+def _tap(text: str) -> str | None:
+    """The button code if this is how the engine stores a tap ("[button FEES]")."""
+    code = text[8:-1] if text.startswith("[button ") and text.endswith("]") else ""
+    return code if PAYLOAD.fullmatch(code) else None
 
 
 def _valid(value, pattern: re.Pattern) -> str | None:

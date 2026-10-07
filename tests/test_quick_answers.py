@@ -184,11 +184,121 @@ def test_typed_text_finds_by_normalized_trigger(conn, two):
         assert find_quick_answer(conn, a, text=typed).code == "FEES"
 
 
-@pytest.mark.parametrize("typed", ["fee", "fees please", "what are the fees", "kototaka", ""])
-def test_no_fuzzy_matching(conn, two, typed):
+def office(conn, t, **overrides):
+    values = {
+        "code": "OFFICE",
+        "triggers": ["address", "office kothay", "ঠিকানা", "location"],
+        "answers": {"en": "House 5, Banani."},
+    }
+    return save_quick_answer(conn, t, **{**values, **overrides})
+
+
+# The owner's phone check (D-025): typos and question words around a trigger still match.
+@pytest.mark.parametrize(
+    "typed, code",
+    [
+        ("fee", "FEES"),
+        ("fess", "FEES"),
+        ("feees", "FEES"),
+        ("fees please", "FEES"),
+        ("what are the fees", "FEES"),
+        ("apnader fee koto?", "FEES"),
+        ("taka", "FEES"),  # "koto taka" less its question word
+        ("address kothay", "OFFICE"),
+        ("where is your address?", "OFFICE"),
+        ("adresss", "OFFICE"),
+        ("adddress koi", "OFFICE"),
+        ("address ki", "OFFICE"),
+        ("addres kothai", "OFFICE"),
+        ("office", "OFFICE"),
+        ("ofice kothay", "OFFICE"),
+        ("ঠিকানা কোথায়", "OFFICE"),
+        # real typos, not just doubled letters: one wrong, extra or missing letter in a word of
+        # 4-6 letters ("ofice"), up to two in a longer one ("location")
+        ("ofise kothay", "OFFICE"),
+        ("ofixce", "OFFICE"),
+        ("ofce", "OFFICE"),
+        ("adr koi", "OFFICE"),
+        ("locasion", "OFFICE"),
+        ("lokasion", "OFFICE"),
+        ("আপনাদের ঠিকানা কি", "OFFICE"),
+    ],
+)
+def test_typos_and_question_words_still_match(conn, two, typed, code):
     a, _ = two
     fees(conn, a)
+    office(conn, a)
+    assert find_quick_answer(conn, a, text=typed).code == code
+
+
+@pytest.mark.parametrize(
+    "typed",
+    [
+        "",
+        "where is",  # only question words
+        "kototaka",  # one word that isn't a trigger
+        "fees for UK",  # more than the trigger: the AI answers
+        "address of oxford university",
+        "feed",  # short words must be exact: "fe" vs "fed"
+        "free",
+        "box",
+        "adrs xyz",
+        "ofxyz",  # two letters off a 5-letter word
+        "lokasyon",  # three letters off an 8-letter word
+    ],
+)
+def test_other_text_doesnt_match(conn, two, typed):
+    a, _ = two
+    fees(conn, a)
+    office(conn, a)
+    save_quick_answer(conn, a, code="BOOK", triggers=["book"], action="start_booking")
     assert find_quick_answer(conn, a, text=typed) is None
+
+
+def test_longer_numbers_must_match_exactly_too(conn, two):
+    a, _ = two
+    save_quick_answer(conn, a, code="JAN", triggers=["intake 2027"], answers={"en": "Open."})
+    assert find_quick_answer(conn, a, text="intake 2027 ki").code == "JAN"
+    assert find_quick_answer(conn, a, text="intake 2026") is None  # one digit off is not a typo
+
+
+@pytest.mark.parametrize("typed", ["ielts 6", "ielts 7 5", "ielts 6 0"])
+def test_numbers_must_match_exactly(conn, two, typed):  # PRD §20: "IELTS 6" isn't "IELTS 6.5"
+    a, _ = two
+    save_quick_answer(conn, a, code="IELTS", triggers=["ielts 6.5"], answers={"en": "Yes."})
+    assert find_quick_answer(conn, a, text="ielts 6.5?").code == "IELTS"
+    assert find_quick_answer(conn, a, text="ieltss 6.5").code == "IELTS"
+    assert find_quick_answer(conn, a, text=typed) is None
+
+
+def test_two_answers_that_both_fit_mean_neither(conn, two):
+    a, _ = two
+    office(conn, a)
+    save_quick_answer(conn, a, code="BRANCH", triggers=["adres"], answers={"en": "Two."})
+    assert find_quick_answer(conn, a, text="addresss") is None  # fits both: the AI answers
+    assert find_quick_answer(conn, a, text="adres").code == "BRANCH"  # exact still wins
+
+
+def test_an_exact_trigger_beats_a_forgiving_match(conn, two):
+    a, _ = two
+    fees(conn, a)
+    save_quick_answer(conn, a, code="PRICE", triggers=["fee"], answers={"en": "Price list."})
+    assert find_quick_answer(conn, a, text="fee").code == "PRICE"
+
+
+def test_forgiving_match_skips_switched_off_and_other_companies(conn, two):
+    a, b = two
+    office(conn, b)
+    office(conn, a, active=False)
+    assert find_quick_answer(conn, a, text="address kothay") is None
+    assert find_quick_answer(conn, b, text="address kothay").code == "OFFICE"
+
+
+def test_a_trigger_of_only_question_words_never_matches(conn, two):
+    a, _ = two
+    save_quick_answer(conn, a, code="HUH", triggers=["kothay"], answers={"en": "?"})
+    assert find_quick_answer(conn, a, text="kothay").code == "HUH"  # exact is fine
+    assert find_quick_answer(conn, a, text="kothai") is None
 
 
 @pytest.mark.parametrize("payload", ["fees", "NOPE", "F", "FEES ", "X" * 41, 5, b"FEES", ""])

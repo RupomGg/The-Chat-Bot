@@ -380,6 +380,7 @@ class Engine:
         if outcome.kind != "reply":
             if outcome.action == "alert":
                 self.notify("alert", {"tenant": tenant["id"], "error": outcome.error})
+                return self._ai_unavailable(conn, tenant, conversation, now, outcome.error)
             return self._fallback(conn, tenant, conversation, now, outcome.error or "fallback")
 
         text = outcome.text
@@ -420,6 +421,16 @@ class Engine:
         self._handoff(conn, tenant, conversation, now, "unanswered", why)
         self.notify("handoff", {"tenant": tenant["id"], "conversation": conversation["id"]})
         return Reply(tenant["fallback"], "fallback", effects=("handoff",))
+
+    def _ai_unavailable(self, conn, tenant, conversation, now, why: str) -> Reply:
+        """The AI can't work at all (no key, a rejected key), for every chat until the operator
+        fixes it. Handing each chat over would leave it quiet for a day, so the bot stays on:
+        the fallback text, the quick-answer buttons, and the question logged for staff (owner,
+        2026-10-07: "it should answer from the cached text when the API key isn't working")."""
+        detail = {"reason": "ai_unavailable", "error": why}
+        self._event(conn, tenant, conversation, now, "unanswered", detail)
+        buttons = self._redirect(conn, tenant).buttons
+        return Reply(tenant["fallback"], "fallback", buttons=buttons)
 
     def _handoff(self, conn, tenant, conversation, now, reason, summary) -> None:
         conn.execute(

@@ -123,7 +123,9 @@ form button { width: 44px; height: 44px; border-radius: 10px; background: var(--
   const waiting = new Set();
   addEventListener("online", () => waiting.forEach((done) => done()));
 
+  let toldWaiting = false; // the "a counsellor will reply" note is shown, nobody has replied yet
   const add = (role, text) => {
+    if (role !== "student") toldWaiting = false;
     const div = document.createElement("div");
     div.className = "msg " + role;
     div.textContent = text;
@@ -242,6 +244,12 @@ form button { width: 44px; height: 44px; border-radius: 10px; background: var(--
         return;
       }
       const event = reply(text);
+      // A person has this chat: the bot stays quiet, so say why, once (found in the phone check).
+      if (event && event.waiting && !toldWaiting) {
+        toldWaiting = true;
+        note("A counsellor has this chat and will reply here.");
+        log.lastChild.classList.add("waiting");
+      }
       // No text: already answered (a resend) or a person has taken over; the poll shows it.
       if (event && event.text && event.after > lastId) {
         lastId = event.after;

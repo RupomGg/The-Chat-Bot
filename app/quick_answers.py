@@ -3,6 +3,7 @@ with no AI call. Each company edits its own; the database records every change
 (migration 003), so any change can be undone.
 """
 
+import itertools
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -68,6 +69,68 @@ def normalize_trigger(text) -> str | None:
     return result if result and len(result) <= MAX_TRIGGER else None
 
 
+# Words that only turn a trigger into a question: "address kothay", "where is your office",
+# "apnader fee koto", "ঠিকানা কোথায়". The forgiving match drops them (D-025).
+FILLER_WORDS = """
+    where is are the your you what whats of please pls tell me about my a an i want to know
+    can how much do does give info details
+    ki koi kothay kothai kotay kotha koto ta ti apnader apnar bolen bolun bolo jante chai ache kon
+    কি কী কই কোথায় কত টা টি আপনাদের আপনার বলেন বলুন জানতে চাই আছে কোন
+"""
+FILLER = frozenset(fold_text(word) for word in FILLER_WORDS.split())
+
+
+def _word(word: str) -> str:
+    """'adddresss' → 'adre', 'feees' → 'fe': repeated letters once, an English plural s off."""
+    word = "".join(letter for letter, _ in itertools.groupby(word))
+    return word[:-1] if word.endswith("s") else word
+
+
+def _key(text: str) -> tuple[str, ...]:
+    return tuple(_word(w) for w in fold_text(text).split() if w not in FILLER)
+
+
+def _distance(a: str, b: str) -> int:
+    """Letters to add, remove or change to turn a into b (Levenshtein)."""
+    row = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        previous, row[0] = row[0], i
+        for j, y in enumerate(b, 1):
+            previous, row[j] = row[j], min(row[j] + 1, row[j - 1] + 1, previous + (x != y))
+    return row[-1]
+
+
+def _close(typed: str, trigger: str) -> bool:
+    if typed == trigger:
+        return True
+    if any(ch.isdigit() for ch in typed + trigger):
+        return False  # "IELTS 6" is not "IELTS 5" (PRD §20)
+    allowed = 0 if len(trigger) <= 3 else 1 if len(trigger) <= 6 else 2
+    return _distance(typed, trigger) <= allowed
+
+
+def _forgiving_match(conn, tenant_id, text: str):
+    """The one quick answer whose trigger the text is, give or take typos and question words.
+
+    Nothing else may be left in the text ("fees for UK" goes to the AI), numbers must match
+    exactly, and if two answers fit, neither is used (D-025).
+    """
+    typed = _key(text)
+    if not typed:
+        return None
+    found = {}
+    for row in conn.execute(FIND_ALL, (tenant_id,)):
+        for trigger in row[-1]:
+            key = _key(trigger)
+            if len(key) == len(typed) and all(map(_close, typed, key)):
+                found[row[0]] = row[:-1]
+    return next(iter(found.values())) if len(found) == 1 else None
+
+
+FIND_ALL = """
+SELECT id, code, answers, buttons, action, triggers FROM quick_answers
+WHERE tenant_id = %s AND active
+"""
 FIND_BY_CODE = """
 SELECT id, code, answers, buttons, action FROM quick_answers
 WHERE tenant_id = %s AND active AND code = %s
@@ -80,7 +143,8 @@ WHERE tenant_id = %s AND active AND %s = ANY (triggers)
 
 def find_quick_answer(conn, tenant_id, *, payload=None, text=None, language="en"):
     """This tenant's active quick answer for a button payload (exact code) or typed text
-    (exact normalized trigger, no fuzzy matching). None: no match, so the AI answers.
+    (exact normalized trigger, else the forgiving match: typos and question words, D-025).
+    None: no match, so the AI answers.
 
     The answer is in the student's language, else English, else any language it has.
     """
@@ -95,6 +159,7 @@ def find_quick_answer(conn, tenant_id, *, payload=None, text=None, language="en"
         if trigger is None:
             return None
         row = conn.execute(FIND_BY_TRIGGER, (tenant_id, trigger)).fetchone()
+        row = row or _forgiving_match(conn, tenant_id, trigger)
     if row is None:
         return None
     id_, code, answers, buttons, action = row

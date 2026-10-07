@@ -39,7 +39,9 @@ def browser():
         # Test only: here the "customer website" is public and our server is this computer, which
         # Chrome blocks (local network access). Live, both are public addresses.
         local = "--disable-features=BlockInsecurePrivateNetworkRequests,LocalNetworkAccessChecks"
-        browser = p.chromium.launch(args=[local])
+        # lan.test: this computer under a plain-http name, like a phone on Wi-Fi sees the PC
+        lan = "--host-resolver-rules=MAP lan.test 127.0.0.1"
+        browser = p.chromium.launch(args=[local, lan])
         yield browser
         browser.close()
 
@@ -207,6 +209,32 @@ def test_a_late_poll_doesnt_repeat_messages(page):
     expect(bubbles(page, "student")).to_have_count(1)
 
 
+def test_a_handed_over_chat_says_a_counsellor_will_reply(page, server):
+    # found in the owner's phone check: after the hand-over, messages seemed ignored
+    ask(page, "fees")  # the first message makes the conversation; hand it over after
+    expect(bubbles(page, "bot")).to_have_count(2)
+    with psycopg.connect(server.db, autocommit=True) as conn:
+        conn.execute(
+            "UPDATE conversations SET state = 'human', paused_until = now() + interval '1 day'"
+        )
+    waiting = page.locator("chat-widget .note.waiting")
+    ask(page, "address")
+    expect(waiting).to_have_text("A counsellor has this chat and will reply here.")
+    ask(page, "hello?")
+    expect(bubbles(page, "student")).to_have_count(3)
+    page.wait_for_timeout(500)
+    expect(waiting).to_have_count(1)  # said once, not after every message
+    expect(bubbles(page, "bot")).to_have_count(2)  # the bot stays quiet
+    with psycopg.connect(server.db, autocommit=True) as conn:  # the counsellor replies
+        conn.execute(
+            "INSERT INTO messages (tenant_id, conversation_id, role, content)"
+            " SELECT tenant_id, id, 'staff', 'Hi, I am Rima.' FROM conversations"
+        )
+    expect(page.locator("chat-widget .msg.staff")).to_have_text("Hi, I am Rima.", timeout=10_000)
+    ask(page, "ok, and the fees?")  # quiet again after the reply: say it again
+    expect(waiting).to_have_count(2)
+
+
 def test_shift_enter_is_a_new_line(page):
     box = page.locator("chat-widget textarea")
     box.fill("line one")
@@ -225,6 +253,15 @@ def test_conversation_survives_a_reload(shop, server):
     page.locator("chat-widget .launch").click()
     expect(bubbles(page, "student")).to_have_text(["fees"])
     expect(bubbles(page, "bot")).to_have_count(2)  # greeting + the reply
+
+
+def test_a_tapped_button_shows_its_label_after_a_reload(page):
+    # found in the owner's device check: history showed "[button FEES]"
+    page.locator("chat-widget .chips button", has_text="Address").click()
+    expect(bubbles(page, "bot").last).to_have_text(re.compile("^House 5"))
+    page.reload()
+    page.locator("chat-widget .launch").click()
+    expect(bubbles(page, "student")).to_have_text(["Address"])
 
 
 def test_long_chats_load_completely(shop, server):
@@ -505,9 +542,12 @@ def test_theme_colour_and_continue_links(shop, server):
     expect(links.last).to_have_attribute("href", "https://m.me/demo.consultancy")
 
 
-def test_the_demo_page(new_context, server):
+@pytest.mark.parametrize("host", ["127.0.0.1", "lan.test"])
+def test_the_demo_page(new_context, server, host):
+    # lan.test isn't a "secure" address, so browsers send fewer headers: the phone check
+    # found the widget refused there (fixed); 127.0.0.1 counts as secure.
     page = new_context().new_page()
-    page.goto(server.url + "/demo")
+    page.goto(server.url.replace("127.0.0.1", host) + "/demo")
     page.locator("chat-widget .launch").click()
     ask(page, "fees")  # our own page: same origin, no allow-list entry needed
     expect(bubbles(page, "bot").last).to_have_text(re.compile("^Counselling"))
