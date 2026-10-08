@@ -677,3 +677,33 @@ def test_the_demo_page(web):
     assert response.status_code == 200
     assert response.headers["content-type"] == "text/html; charset=utf-8"
     assert '<script src="/widget.js" data-company="demo" async></script>' in response.text
+
+
+@pytest.mark.parametrize(
+    "path, must_say",
+    [
+        (
+            "/privacy",
+            [
+                "data controller",
+                "processor",
+                "12 months",
+                "Singapore",
+                "Anthropic",
+                "Google",
+                "Meta",
+                "Telegram",
+                "Resend",
+                "delete",
+                "18",
+            ],
+        ),
+        ("/terms", ["not a promise", "never guarantees", "/privacy"]),
+    ],
+)
+def test_privacy_and_terms_pages(web, path, must_say):
+    response = web.get(path, headers={})  # public pages: no Origin needed
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/html; charset=utf-8"
+    for words in must_say:
+        assert words in response.text

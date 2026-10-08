@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import db, jobs, llm
-from app.channels import web
+from app.channels import messenger, web
 from app.config import Config, load_config
 from app.engine import Engine
 
@@ -49,6 +49,7 @@ def create_app(config: Config | None = None, engine: Engine | None = None) -> Fa
     app.state.per_visitor = web.RateLimit(web.PER_VISITOR)
     app.state.per_ip = web.RateLimit(web.PER_IP)
     app.include_router(web.router)
+    app.include_router(messenger.router)
 
     @app.get("/healthz")
     def healthz() -> dict:

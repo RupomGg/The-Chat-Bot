@@ -169,6 +169,22 @@ def find_quick_answer(conn, tenant_id, *, payload=None, text=None, language="en"
     return QuickAnswer(id_, code, answers.get(chosen), chosen, tuple(buttons), action)
 
 
+def button_labels(conn, tenant_id: int, codes) -> list[dict]:
+    """Codes with a label to show on a button: the quick answer's first trigger phrase,
+    capitalised, at most 20 characters (Messenger's limit, the smallest): "Fees". A code with
+    no quick answer shows the code ("Talk to us").
+
+    ponytail: no label column yet; add one when an admin needs a label that isn't a trigger.
+    """
+    rows = conn.execute(
+        "SELECT code, triggers[1] FROM quick_answers WHERE tenant_id = %s AND code = ANY(%s)",
+        (tenant_id, list(codes)),
+    ).fetchall()
+    first = {code: trigger for code, trigger in rows if trigger}
+    labels = {code: first.get(code, code.replace("_", " ").lower()) for code in codes}
+    return [{"code": code, "label": labels[code][:20].capitalize()} for code in codes]
+
+
 # ---------- editing ----------
 
 

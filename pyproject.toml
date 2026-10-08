@@ -19,6 +19,7 @@ dependencies = [
     "cryptography==50.0.1",
     "sentry-sdk==2.70.0",
     "tzdata==2026.4",  # timezone data on Windows and slim Linux images (D-016)
+    "httpx==0.28.1",  # Graph API sends (P5.3)
 ]
 
 [project.optional-dependencies]
@@ -28,7 +29,6 @@ dev = [
     "coverage==7.16.1",
     "ruff==0.16.8",
     "hypothesis==6.168.0",
-    "httpx==0.28.1",
     "pyyaml==6.0.3",
     "playwright==1.63.0",  # widget tests in a real Chromium (P5.2); browser: playwright install
 ]

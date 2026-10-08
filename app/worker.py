@@ -10,8 +10,12 @@ import logging
 import signal
 import threading
 
+import httpx
+
 from app import db, jobs
+from app.channels import messenger
 from app.config import load_config
+from app.engine import Engine
 
 log = logging.getLogger("app.worker")
 
@@ -78,10 +82,18 @@ class Worker:
         self.stopping.set()
 
 
+def channel_handlers(config) -> dict:
+    """The channels' jobs (P5.3 on), wired to this config's AI keys and an HTTP client."""
+    from app.main import ai_clients  # the web app's module; imported here, when it's needed
+
+    engine = Engine(ai_clients(config))
+    return messenger.handlers(engine, config.fernet_key, httpx.Client(timeout=15))
+
+
 def main(worker=None, config=None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     config = config or load_config()
-    worker = worker or Worker()
+    worker = worker or Worker(HANDLERS | channel_handlers(config))
     db.wait_for_db(config.database_url)
     db.migrate(config.database_url)  # safe if the web service migrates at the same time
     previous = {sig: signal.signal(sig, worker.stop) for sig in (signal.SIGTERM, signal.SIGINT)}

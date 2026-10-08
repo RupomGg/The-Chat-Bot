@@ -458,7 +458,8 @@ def test_main_uses_defaults(monkeypatch, env_vars):
     monkeypatch.setattr(worker, "load_config", lambda: load_config(env_vars))
     monkeypatch.setattr(Worker, "run", lambda self, pool: ran.append(self))
     main()
-    assert len(ran) == 1 and ran[0].handlers is worker.HANDLERS
+    assert len(ran) == 1
+    assert ran[0].handlers.keys() == worker.HANDLERS.keys() | {"messenger_event", "messenger_send"}
 
 
 def test_unknown_kind_taken_over_meanwhile_doesnt_alert_twice(conn, monkeypatch):

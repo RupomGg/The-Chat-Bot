@@ -30,6 +30,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 
 from app.contact_details import normalize_https_url
 from app.engine import Inbound
+from app.quick_answers import button_labels
 
 MAX_TEXT = 1000  # F8: same cap as the AI prompt (MAX_STUDENT_CHARS)
 VISITOR = re.compile(r"[A-Za-z0-9_-]{16,64}")  # random id from the widget: long enough not to guess
@@ -227,27 +228,12 @@ def _reply(state, company, data) -> dict:
     with state.pool.connection() as conn:
         reply = state.engine.handle(conn, msg, now=now)
         after = _latest_id(conn, channel_id, data["visitor"])
-        buttons = _buttons(conn, tenant_id, reply.buttons)
+        buttons = button_labels(conn, tenant_id, reply.buttons)
     # ponytail: the whole reply in one event (replies are 1-4 sentences); token streaming
     # can add "delta" events later without changing this format.
     # waiting: a person has this chat, so the bot stays quiet; the widget says so once.
     waiting = reply.source == "silent"
     return {"text": reply.text, "buttons": buttons, "after": after, "waiting": waiting}
-
-
-def _buttons(conn, tenant_id: int, codes) -> list[dict]:
-    """Codes with a label to show: the quick answer's first trigger phrase ("Fees").
-
-    ponytail: no label column yet; add one when an admin needs a label that isn't a trigger
-    (Messenger and WhatsApp button titles may want it, P5.3-P5.4).
-    """
-    rows = conn.execute(
-        "SELECT code, triggers[1] FROM quick_answers WHERE tenant_id = %s AND code = ANY(%s)",
-        (tenant_id, list(codes)),
-    ).fetchall()
-    first = {code: trigger for code, trigger in rows if trigger}
-    labels = {code: first.get(code, code.replace("_", " ").lower()) for code in codes}
-    return [{"code": code, "label": labels[code][:20].capitalize()} for code in codes]
 
 
 @router.get("/api/chat/{slug}/poll")
@@ -268,7 +254,7 @@ def poll(slug: str, request: Request, visitor: str = "", after: int = 0):
         ).fetchall()
         # A tap is stored as "[button FEES]"; the visitor saw the button's label, so show that.
         taps = {_tap(text) for _, role, text in rows if role == "student"} - {None}
-        labels = {b["code"]: b["label"] for b in _buttons(conn, company[0], sorted(taps))}
+        labels = {b["code"]: b["label"] for b in button_labels(conn, company[0], sorted(taps))}
     messages = [
         {"id": i, "role": role, "text": labels.get(_tap(text) if role == "student" else None, text)}
         for i, role, text in rows
@@ -305,7 +291,7 @@ def widget_config(slug: str, request: Request):
                 )
             ]
         chips = [c for c in chips if isinstance(c, str) and PAYLOAD.fullmatch(c)][:MAX_CHIPS]
-        buttons = _buttons(conn, tenant_id, chips)
+        buttons = button_labels(conn, tenant_id, chips)
     config = {
         "name": name,
         "color": _valid(theme.get("color"), COLOR) or "#0f766e",
@@ -334,3 +320,14 @@ def widget_js():
 def demo_page():
     """A page to try the widget on, here and on phones (the P5.2 device check)."""
     return FileResponse(STATIC / "demo.html", media_type="text/html; charset=utf-8")
+
+
+@router.get("/privacy")
+def privacy_page():
+    """Linked from the widget and every channel's first message; Meta requires it (P5.3)."""
+    return FileResponse(STATIC / "privacy.html", media_type="text/html; charset=utf-8")
+
+
+@router.get("/terms")
+def terms_page():
+    return FileResponse(STATIC / "terms.html", media_type="text/html; charset=utf-8")

@@ -105,6 +105,35 @@ class Engine:
                 self._store_bot(conn, tenant, conversation, reply, turn, msg, now)
             return reply
 
+    def human_replied(self, conn, msg: Inbound, *, now: datetime.datetime) -> None:
+        """A person answered from the channel's own app (the Page inbox, the WhatsApp Business
+        app): keep it as a staff message and pause the bot, as a takeover in our inbox would
+        (F21). `msg` is that reply, addressed to the customer."""
+        with conn.transaction():
+            tenant = self._tenant(conn, msg.tenant_id)
+            contact = self._contact(conn, msg)
+            conversation = self._conversation(conn, tenant, contact, now)
+            if (
+                msg.external_id
+                and conn.execute(
+                    "SELECT 1 FROM messages WHERE conversation_id = %s AND external_id = %s",
+                    (conversation["id"], msg.external_id),
+                ).fetchone()
+            ):
+                return  # the same echo delivered twice
+            conn.execute(
+                "INSERT INTO messages (tenant_id, conversation_id, role, content, external_id,"
+                " created_at) VALUES (%s, %s, 'staff', %s, %s, %s)",
+                (
+                    tenant["id"],
+                    conversation["id"],
+                    msg.text or f"[{msg.media or 'message'}]",
+                    msg.external_id,
+                    msg.received_at,
+                ),
+            )
+            self._handoff(conn, tenant, conversation, now, "human_replied", "from the channel app")
+
     # ---------- loading ----------
 
     def _tenant(self, conn, tenant_id) -> dict:

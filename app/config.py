@@ -19,6 +19,7 @@ SECRET_FIELDS = (
     "session_secret",
     "anthropic_api_key",
     "gemini_api_key",
+    "meta_verify_token",
 )
 MIN_SESSION_SECRET = 32
 
@@ -36,6 +37,7 @@ class Config:
     public_base_url: str
     anthropic_api_key: str = ""
     gemini_api_key: str = ""
+    meta_verify_token: str = ""  # Meta's webhook setup check (P5.3); empty: refuse it
 
     def __repr__(self) -> str:
         parts = []
@@ -107,4 +109,5 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
         public_base_url=base_url,
         anthropic_api_key=source.get("ANTHROPIC_API_KEY", "").strip(),
         gemini_api_key=source.get("GEMINI_API_KEY", "").strip(),
+        meta_verify_token=source.get("META_VERIFY_TOKEN", "").strip(),
     )
