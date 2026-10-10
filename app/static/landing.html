@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Halcyo: every customer message answered</title>
+<meta name="description" content="Halcyo replies on Messenger, WhatsApp and your website in Bangla, Banglish or English, and books appointments for you.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anek+Bangla:wght@500;600;700&family=Hind+Siliguri:wght@400;500;600&display=swap">
+<style>
+:root {
+  --brand: #2453D6; --on-brand: #FFFFFF; --sun: #F6A43C;
+  --ink: #16181D; --soft: #4B5060; --bg: #F7F7F5; --surface: #FFFFFF;
+  --wash: #EAF0FF; --wash-sun: #FDF0DC; --line: #E3E3DF;
+  --glow-a: rgb(36 83 214 / .16); --glow-b: rgb(246 164 60 / .20); --bubble: rgb(36 83 214 / .14);
+  --shadow: 0 1px 2px rgb(22 24 29 / .04), 0 12px 32px rgb(36 83 214 / .10);
+  --display: "Anek Bangla", "Hind Siliguri", system-ui, sans-serif;
+  --body: "Hind Siliguri", "Noto Sans Bengali", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --brand: #8EAAFF; --on-brand: #0E1015;
+    --ink: #ECEDEF; --soft: #A3A8B5; --bg: #0E1015; --surface: #171A21;
+    --wash: #1C2440; --wash-sun: #33291A; --line: #262A33;
+    --glow-a: rgb(142 170 255 / .14); --glow-b: rgb(246 164 60 / .10); --bubble: rgb(142 170 255 / .18);
+    --shadow: 0 20px 50px rgb(0 0 0 / .4);
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 18px/1.6 var(--body); }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; margin: 0; }
+p { margin: 0; }
+a { color: var(--brand); }
+:lang(bn), :lang(bn) * { line-height: 1.7; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+@media (min-width: 768px) { .wrap { padding: 0 32px; } }
+section { padding: 72px 0; }
+@media (min-width: 1024px) { section { padding: 104px 0; } }
+.h2 { font-size: clamp(30px, 4vw, 42px); line-height: 1.15; max-width: 22ch; }
+.lead { color: var(--soft); max-width: 60ch; margin-top: 16px; }
+
+/* Buttons */
+.btn, .btn2 { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px;
+  padding: 12px 26px; border-radius: 999px; font: 600 16px/1 var(--body); text-decoration: none; cursor: pointer;
+  border: 0; white-space: nowrap; transition: transform .15s, background-color .15s; }
+.btn { background: var(--brand); color: var(--on-brand); }
+.btn:hover { background: color-mix(in srgb, var(--brand) 88%, var(--ink)); }
+.btn2 { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.btn:active, .btn2:active { transform: translateY(1px); }
+:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; border-radius: 8px; }
+
+/* Nav */
+header { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 92%, transparent);
+  border-bottom: 1px solid var(--line); backdrop-filter: saturate(1.2) blur(8px); }
+nav { display: flex; align-items: center; gap: 28px; height: 64px; }
+.logo { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none;
+  font: 700 24px/1 var(--display); }
+.logo svg { color: var(--brand); }
+.links { display: none; gap: 24px; }
+.links a { color: var(--ink); text-decoration: none; font-weight: 500; font-size: 16px; }
+.links a:hover { color: var(--brand); }
+nav .btn { margin-left: auto; min-height: 40px; padding: 10px 18px; font-size: 15px; }
+@media (min-width: 900px) { .links { display: flex; } }
+
+/* Animated background (hero and final CTA only) */
+.alive { position: relative; overflow: hidden; isolation: isolate; }
+.bg { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.glow { position: absolute; width: 560px; height: 560px; border-radius: 50%; filter: blur(80px); }
+.glow.a { background: var(--glow-a); top: -160px; right: -120px; animation: drift-a 28s ease-in-out infinite alternate; }
+.glow.b { background: var(--glow-b); bottom: -220px; left: -160px; animation: drift-b 32s ease-in-out infinite alternate; }
+@keyframes drift-a { to { transform: translate(-220px, 160px) scale(1.15); } }
+@keyframes drift-b { to { transform: translate(260px, -120px) scale(.9); } }
+.bub { position: absolute; bottom: -80px; color: var(--bubble); animation: rise linear infinite; }
+@keyframes rise { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: 1; } 85% { opacity: 1; }
+  100% { transform: translateY(-115vh); opacity: 0; } }
+
+/* Hero */
+.hero { padding: 48px 0 72px; }
+.hero .wrap { display: grid; gap: 48px; align-items: center; }
+@media (min-width: 1024px) { .hero { padding: 72px 0 104px; } .hero .wrap { grid-template-columns: 1.1fr .9fr; } }
+.hero h1 { font-size: clamp(38px, 5.2vw, 60px); line-height: 1.08; max-width: 15ch; }
+.hero h1 span { color: var(--brand); display: block; white-space: nowrap; }
+.hero .lead { font-size: 19px; max-width: 34ch; }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+
+/* Chat mockup */
+.phone { background: var(--surface); border-radius: 28px; box-shadow: var(--shadow); padding: 14px;
+  max-width: 380px; width: 100%; margin: 0 auto; border: 1px solid var(--line); }
+.phone-head { display: flex; align-items: center; gap: 10px; padding: 6px 6px 14px; border-bottom: 1px solid var(--line); }
+.avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--wash); color: var(--brand);
+  display: grid; place-items: center; font: 700 16px/1 var(--display); flex: none; }
+.phone-head b { display: block; font: 600 15px/1.2 var(--body); }
+.phone-head small { color: var(--soft); font-size: 13px; }
+.thread { display: flex; flex-direction: column; gap: 8px; padding: 14px 4px 6px; min-height: 380px; }
+.msg { max-width: 84%; padding: 9px 13px; border-radius: 16px; font-size: 15.5px; line-height: 1.5;
+  animation: pop .3s ease-out both; }
+.msg.c { align-self: flex-end; background: var(--brand); color: var(--on-brand); border-bottom-right-radius: 4px; }
+.msg.b { align-self: flex-start; background: var(--wash); color: var(--ink); border-bottom-left-radius: 4px; }
+.time { align-self: center; font-size: 12px; color: var(--soft); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; animation: pop .3s ease-out both; }
+.chip { padding: 6px 12px; border-radius: 999px; font-size: 14px; font-weight: 500;
+  box-shadow: inset 0 0 0 1px var(--brand); color: var(--brand); }
+.chip.on { background: var(--brand); color: var(--on-brand); }
+.typing { align-self: flex-start; background: var(--wash); border-radius: 16px; padding: 12px 14px; display: flex; gap: 4px; }
+.typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--soft); animation: blink 1s infinite; }
+.typing i:nth-child(2) { animation-delay: .15s; } .typing i:nth-child(3) { animation-delay: .3s; }
+.booked { display: inline-block; margin-left: 6px; padding: 1px 9px; border-radius: 999px; background: var(--sun);
+  color: #16181D; font-size: 12.5px; font-weight: 600; vertical-align: 1px; }
+@keyframes pop { from { opacity: 0; transform: translateY(6px); } }
+@keyframes blink { 50% { opacity: .3; } }
+.dots { display: flex; justify-content: center; gap: 6px; margin-top: 16px; }
+.dots button { width: 8px; height: 8px; padding: 0; border-radius: 50%; border: 0; background: var(--line); cursor: pointer; }
+.dots button[aria-pressed="true"] { background: var(--brand); width: 22px; border-radius: 999px; }
+
+/* Problem band */
+.band { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 56px 0; }
+.band .wrap { display: grid; gap: 28px; }
+@media (min-width: 900px) { .band .wrap { grid-template-columns: repeat(3, 1fr); gap: 48px; } }
+.band p { font: 500 21px/1.4 var(--display); }
+.band p em { font-style: normal; color: var(--brand); }
+
+/* Industries */
+.tabs { display: flex; gap: 8px; overflow-x: auto; margin: 36px 0 28px; padding-bottom: 4px; }
+.tab { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 18px; border-radius: 999px;
+  border: 0; box-shadow: inset 0 0 0 1px var(--line); background: var(--surface); color: var(--ink);
+  font: 500 16px/1 var(--body); cursor: pointer; white-space: nowrap; }
+.tab[aria-selected="true"] { background: var(--brand); color: var(--on-brand); box-shadow: none; }
+.panel { display: grid; gap: 40px; align-items: start; }
+@media (min-width: 960px) { .panel { grid-template-columns: 1fr 380px; } }
+.facts { display: grid; gap: 28px; }
+.facts h3 { font-size: 20px; margin-bottom: 8px; }
+.facts p { color: var(--soft); }
+.asks { display: flex; flex-wrap: wrap; gap: 8px; }
+.asks span { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); border-radius: 14px; padding: 6px 12px; font-size: 16px; }
+.never { background: var(--wash-sun); border-radius: 16px; padding: 18px 20px; }
+.never p { color: var(--ink); }
+.fits { margin-top: 40px; color: var(--soft); }
+
+/* How it works */
+.how { display: grid; gap: 48px; }
+@media (min-width: 960px) { .how { grid-template-columns: .8fr 1.2fr; } }
+.steps { list-style: none; margin: 0; padding: 0; position: relative; }
+.steps::before { content: ""; position: absolute; left: 7px; top: 10px; bottom: 10px; width: 2px; background: var(--line); }
+.steps li { position: relative; padding: 0 0 26px 40px; }
+.steps li::before { content: ""; position: absolute; left: 0; top: 8px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--surface); box-shadow: inset 0 0 0 4px var(--brand); }
+.steps b { font: 600 20px/1.3 var(--display); display: block; }
+.steps span { color: var(--soft); }
+
+/* Why it's different */
+.grid4 { display: grid; gap: 20px; margin-top: 40px; }
+@media (min-width: 900px) { .grid4 { grid-template-columns: 1.3fr 1fr; } }
+.tile { background: var(--surface); border-radius: 20px; padding: 32px; box-shadow: inset 0 0 0 1px var(--line); }
+.tile.big { background: var(--wash); box-shadow: none; }
+.tile.warm { background: var(--wash-sun); box-shadow: none; }
+.tile i { font-size: 28px; color: var(--brand); }
+.tile h3 { font-size: 23px; line-height: 1.25; margin: 14px 0 8px; }
+.tile p { color: var(--soft); }
+.langs { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px; }
+.langs span { background: var(--surface); border-radius: 14px; padding: 6px 12px; font-size: 17px; }
+
+/* Pricing */
+.plans { display: grid; gap: 20px; margin-top: 40px; }
+@media (min-width: 900px) { .plans { grid-template-columns: repeat(3, 1fr); } }
+.plan { background: var(--surface); border-radius: 20px; padding: 28px; box-shadow: inset 0 0 0 1px var(--line); display: flex; flex-direction: column; }
+.plan.pick { box-shadow: inset 0 0 0 2px var(--brand); }
+.plan h3 { font-size: 22px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.plan h3 small { font: 500 14px/1 var(--body); color: var(--brand); }
+.price { font: 700 40px/1 var(--display); margin: 18px 0 4px; }
+.price small { font: 400 16px/1 var(--body); color: var(--soft); }
+.plan ul { list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 10px; color: var(--soft); font-size: 16px; }
+.plan li { display: flex; gap: 10px; }
+.plan li i { color: var(--brand); margin-top: 4px; }
+.note { margin-top: 20px; color: var(--soft); font-size: 16px; }
+.pilot { margin-top: 20px; background: var(--wash-sun); border-radius: 20px; padding: 24px 28px; display: flex;
+  flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; }
+.pilot p { font: 600 20px/1.35 var(--display); max-width: 46ch; }
+
+/* FAQ */
+.faq { display: grid; gap: 32px; }
+@media (min-width: 960px) { .faq { grid-template-columns: .8fr 1.2fr; } }
+details { border-bottom: 1px solid var(--line); }
+summary { list-style: none; display: flex; justify-content: space-between; gap: 16px; padding: 20px 0; cursor: pointer;
+  font: 600 19px/1.35 var(--display); }
+summary::-webkit-details-marker { display: none; }
+summary i { color: var(--brand); transition: transform .2s; flex: none; margin-top: 3px; }
+details[open] summary i { transform: rotate(45deg); }
+details p { color: var(--soft); padding: 0 0 20px; max-width: 62ch; }
+
+/* About + final CTA + footer */
+.about { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+.about .avatar { width: 64px; height: 64px; font-size: 24px; }
+.about b { font: 600 20px/1.3 var(--display); display: block; }
+.about p { color: var(--soft); max-width: 60ch; }
+.final { text-align: center; padding: 104px 0; }
+.final h2 { font-size: clamp(32px, 4.6vw, 52px); line-height: 1.1; max-width: 18ch; margin: 0 auto; }
+.final p { color: var(--soft); margin: 16px auto 0; }
+.final .ctas { justify-content: center; }
+footer { border-top: 1px solid var(--line); padding: 36px 0; color: var(--soft); font-size: 15px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-between; }
+footer nav { height: auto; gap: 20px; flex-wrap: wrap; }
+footer a { color: var(--soft); text-decoration: none; }
+footer a:hover { color: var(--brand); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  html { scroll-behavior: auto; }
+  .bub { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <nav class="wrap" aria-label="Main">
+    <a class="logo" href="#top" aria-label="Halcyo home">
+      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><path fill="currentColor" d="M6 4h20a4 4 0 0 1 4 4v13a4 4 0 0 1-4 4H14l-7 5v-5H6a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4z"/><path fill="#fff" d="M11 9h3v4.2c.8-.9 1.9-1.4 3.2-1.4 2.4 0 3.8 1.6 3.8 4.2V21h-3v-4.6c0-1.3-.6-2-1.7-2-1.4 0-2.3 1-2.3 2.6v4H11z"/></svg>
+      halcyo
+    </a>
+    <div class="links"><a href="#how">How it works</a><a href="#industries">Industries</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a></div>
+    <a class="btn book" href="#">Book a demo</a>
+  </nav>
+</header>
+
+<main id="top">
+  <section class="hero alive">
+    <div class="bg" aria-hidden="true"><div class="glow a"></div><div class="glow b"></div></div>
+    <div class="wrap">
+      <div>
+        <h1>Every customer message answered. <span>Even at 11 pm.</span></h1>
+        <p class="lead">Halcyo replies on Messenger, WhatsApp and your website in Bangla, Banglish or English, and books appointments for you.</p>
+        <div class="ctas"><a class="btn book" href="#">Book a demo</a><button class="btn2 try" type="button">Try it</button></div>
+      </div>
+      <div>
+        <div class="phone" id="hero-phone"></div>
+        <div class="dots" role="group" aria-label="Example conversations" id="hero-dots"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="band">
+    <div class="wrap">
+      <p>Your Page says <em>"typically replies within a day"</em>. Customers don't wait a day.</p>
+      <p>Most messages come after office hours and on Fridays.</p>
+      <p>You pay for Facebook ads, but can't see which ad brought which customer.</p>
+    </div>
+  </div>
+
+  <section id="industries">
+    <div class="wrap">
+      <h2 class="h2">Made for businesses that sell time, care or advice.</h2>
+      <div class="tabs" role="tablist" aria-label="Industries" id="tabs"></div>
+      <div class="panel" role="tabpanel" id="panel">
+        <div class="facts" id="facts"></div>
+        <div class="phone" id="tab-phone"></div>
+      </div>
+      <p class="fits">Different business? If you sell a service and take bookings, it probably fits. <a class="book" href="#">Ask us.</a></p>
+    </div>
+  </section>
+
+  <section id="how" style="background:var(--surface)">
+    <div class="wrap how">
+      <div>
+        <h2 class="h2">From a message at night to a booking by morning.</h2>
+        <p class="lead">You see every conversation in one inbox. Reply any time, and the bot steps back.</p>
+      </div>
+      <ol class="steps">
+        <li><b>Answers</b><span>Your common questions, only from your own fees, timings and rules.</span></li>
+        <li><b>Learns</b><span>What you need about each customer while chatting. Never a form.</span></li>
+        <li><b>Scores</b><span>Each lead hot, warm or cold.</span></li>
+        <li><b>Books</b><span>The appointment at your branch or online.</span></li>
+        <li><b>Alerts</b><span>Your staff within 30 seconds when a hot lead or a booking comes in, with the chat summary and the ad it came from.</span></li>
+        <li><b>Hands over</b><span>To a person when the customer asks, or when a question needs a professional.</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2 class="h2">Built for real conversations, not a generic chatbot.</h2>
+      <div class="grid4">
+        <div class="tile big">
+          <i class="ph ph-shield-check" aria-hidden="true"></i>
+          <h3>Never plays doctor, lawyer or visa officer.</h3>
+          <p>It answers questions about your business and sends anything professional to your staff.</p>
+        </div>
+        <div class="tile warm">
+          <i class="ph ph-translate" aria-hidden="true"></i>
+          <h3>Speaks like your customers.</h3>
+          <p>Bangla script, Banglish and English, and it switches when they switch.</p>
+          <div class="langs"><span lang="bn">ফি কত?</span><span>Fee koto?</span><span>What's the fee?</span></div>
+        </div>
+        <div class="tile">
+          <i class="ph ph-tray" aria-hidden="true"></i>
+          <h3>One inbox.</h3>
+          <p>Messenger, WhatsApp, Telegram and website chats in one place.</p>
+        </div>
+        <div class="tile">
+          <i class="ph ph-rocket-launch" aria-hidden="true"></i>
+          <h3>Live in 5 working days.</h3>
+          <p>We write your knowledge, connect your Page and train your team.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing" style="background:var(--surface)">
+    <div class="wrap">
+      <h2 class="h2">Simple monthly plans.</h2>
+      <div class="plans">
+        <div class="plan">
+          <h3>Starter</h3>
+          <div class="price">৳12,000 <small>/ month</small></div>
+          <ul>
+            <li><i class="ph ph-check" aria-hidden="true"></i>500 conversations a month</li>
+            <li><i class="ph ph-check" aria-hidden="true"></i>Messenger and website</li>
+            <li><i class="ph ph-check" aria-hidden="true"></i>3 staff seats, bookings</li>
+          </ul>
+        </div>
+        <div class="plan pick">
+          <h3>Growth <small>Most chosen</small></h3>
+          <div class="price">৳25,000 <small>/ month</small></div>
+          <ul>
+            <li><i class="ph ph-check" aria-hidden="true"></i>1,500 conversations a month</li>
+            <li><i class="ph ph-check" aria-hidden="true"></i>Messenger, WhatsApp, Telegram, website</li>
+            <li><i class="ph ph-check" aria-hidden="true"></i>10 seats, events, ad tracking, reports</li>
+          </ul>
+        </div>
+        <div class="plan">
+          <h3>Scale</h3>
+          <div class="price">৳45,000 <small>/ month</small></div>
+          <ul>
+            <li><i class="ph ph-check" aria-hidden="true"></i>4,000 conversations a month</li>
+            <li><i class="ph ph-check" aria-hidden="true"></i>All channels, several branches</li>
+            <li><i class="ph ph-check" aria-hidden="true"></i>Unlimited seats, CRM link, priority support</li>
+          </ul>
+        </div>
+      </div>
+      <p class="note">Setup ৳25,000 once. WhatsApp message fees are billed by Meta directly to you.</p>
+      <div class="pilot">
+        <p>Pilot offer: the first 2 businesses get setup free and 50% off for 3 months.</p>
+        <a class="btn book" href="#">Book a demo</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap faq">
+      <h2 class="h2">Questions owners ask.</h2>
+      <div id="faqs"></div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap about">
+      <div class="avatar" aria-hidden="true">R</div>
+      <div>
+        <b>Md Radwan Ahamed, founder</b>
+        <p>I'm building Halcyo so small businesses in Bangladesh never lose a customer to a slow reply. Now onboarding our first pilot businesses.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="final alive">
+    <div class="bg" aria-hidden="true"><div class="glow a"></div><div class="glow b"></div></div>
+    <div class="wrap">
+      <h2>Your next customer is messaging tonight.</h2>
+      <p>Book a 15-minute demo. We'll show it answering your own questions.</p>
+      <div class="ctas"><a class="btn book" href="#">Book a demo</a><button class="btn2 try" type="button">Try it</button></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <div class="logo" style="font-size:20px;margin-bottom:6px">halcyo</div>
+      <div>Calm days for busy teams. Dhaka, Bangladesh.</div>
+      <div>Built on Claude by Anthropic.</div>
+    </div>
+    <nav aria-label="Footer"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a class="book" href="#">WhatsApp</a></nav>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1" defer></script>
+<script>
+(() => {
+  // One WhatsApp number for every "Book a demo" (country code, digits only).
+  const WHATSAPP = "8801966163995";
+  // Where the chat backend runs, e.g. "https://app.halcyo.tech". Empty = no live widget, "Try it" hidden.
+  const WIDGET_ORIGIN = "";
+
+  const bookHref = WHATSAPP
+    ? "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent("Hi, I saw Halcyo and want a demo.")
+    : "#faq";
+  document.querySelectorAll(".book").forEach((a) => (a.href = bookHref));
+
+  // "Try it" opens the real chat widget (its Shadow DOM is open).
+  const tryButtons = document.querySelectorAll(".try");
+  if (WIDGET_ORIGIN) {
+    const s = document.createElement("script");
+    s.src = WIDGET_ORIGIN + "/widget.js"; s.async = true; s.setAttribute("data-company", "demo");
+    document.body.append(s);
+    tryButtons.forEach((b) => b.addEventListener("click", () =>
+      document.querySelector("chat-widget")?.shadowRoot?.querySelector(".launch")?.click()));
+  } else {
+    tryButtons.forEach((b) => b.remove());
+  }
+
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
+
+  // Example conversations, one per industry.
+  const chats = [
+    { tab: "Study abroad", icon: "ph-graduation-cap", biz: "Bright Path Consultancy", lang: "bn-Latn",
+      c1: "UK te IELTS 6 hole hobe? Total koto lagbe?",
+      b1: "IELTS 6.0 (kono band 5.5 er niche na) hole amader partner university te Bachelor e apply kora jay. Total khoroch city ar university r upor depend kore, counsellor apnake exact hishab diye dibe. Free counselling book korbo?",
+      chips: ["Kal 11 am", "Kal 4 pm", "Online"], pick: 0, done: "Done! Kal 11 am e counselling, Banani office.",
+      asks: ["UK te IELTS 6 hole hobe?", "January intake e ekhono apply kora jabe?", "Solvency koto lakh lagbe?"],
+      does: "Answers from your fees and rules, collects results, IELTS, gap, budget and intake, and books a counselling session.",
+      never: "Visa guarantees or visa odds. Visa cases go to your counsellor." },
+    { tab: "Pet care", icon: "ph-paw-print", biz: "Paws & Care Dhanmondi", lang: "bn-Latn",
+      c1: "Persian cat er grooming koto? Kal sokale slot ache?",
+      b1: "Persian cat er full grooming ৳1,500. Kal sokale 10, 11 ar 12 tay slot khali ache. Konta book korbo?",
+      chips: ["10 am", "11 am", "12 pm"], pick: 1, done: "Booked! Kal 11 am, grooming.",
+      asks: ["Grooming koto taka?", "Kal sokale slot ache?", "Vaccine er jonno ki niye ashbo?"],
+      does: "Answers from your prices and timings, collects pet type, breed, age and service, and books a vet visit or grooming slot.",
+      never: "Diagnosis or treatment. Urgent cases go straight to the vet's phone." },
+    { tab: "Clinics", icon: "ph-stethoscope", biz: "Dr. Rahman's Chamber", lang: "bn",
+      c1: "ডাক্তার রহমানের কালকের সিরিয়াল পাওয়া যাবে?",
+      b1: "জি, কাল সন্ধ্যায় ৫টা, ৫:৩০ আর ৬টায় সিরিয়াল খালি আছে। ভিজিট ফি ৳৮০০। কোনটা নেবেন?",
+      chips: ["৫টা", "৫:৩০", "৬টা"], pick: 1, done: "সিরিয়াল কনফার্ম: কাল ৫:৩০। পুরনো প্রেসক্রিপশন সাথে আনবেন।",
+      asks: ["Dr. er serial kal er jonno pabo?", "Chamber kobe khola thake?", "Visit fee koto?"],
+      does: "Answers from your chamber hours and fees, collects name, phone, preferred doctor and day, and books the serial.",
+      never: "Diagnosis, medicine names or doses. Emergencies go to your phone number and the nearest hospital." },
+    { tab: "Law firms", icon: "ph-scales", biz: "Haque & Associates", lang: "en",
+      c1: "I have a land dispute. How much is a consultation?",
+      b1: "A one-hour consultation is ৳2,000. A lawyer will look at your matter in person. When would you like to come in?",
+      chips: ["Sun 3 pm", "Mon 11 am", "Tue 5 pm"], pick: 0, done: "Booked for Sunday, 3 pm. Please bring your land documents.",
+      asks: ["Consultation fee koto?", "Jomi niye case, kar sathe kotha bolbo?", "Office ki Shonibar khola?"],
+      does: "Answers from your fees and office hours, collects name, phone and type of matter (no case details), and books a consultation.",
+      never: "Legal advice or case outcomes." },
+  ];
+
+  // Builds a phone with one conversation. animate=false shows the finished chat.
+  function play(phone, chat, animate, onDone) {
+    phone.replaceChildren();
+    const head = el("div", "phone-head");
+    head.append(el("div", "avatar", chat.biz[0]));
+    const who = el("div"); who.append(el("b", "", chat.biz), el("small", "", "Replies instantly · Example"));
+    head.append(who);
+    const thread = el("div", "thread"); thread.lang = chat.lang;
+    phone.append(head, thread);
+    const chips = el("div", "chips");
+    chat.chips.forEach((t) => chips.append(el("span", "chip", t)));
+    const done = el("div", "msg b", chat.done); const badge = el("span", "booked", "Booked"); done.append(badge);
+    const steps = [
+      () => thread.append(el("div", "time", "11:42 pm")),
+      () => thread.append(el("div", "msg c", chat.c1)),
+      () => { const t = el("div", "typing"); t.append(el("i"), el("i"), el("i")); thread.append(t); },
+      () => { thread.lastChild.remove(); thread.append(el("div", "msg b", chat.b1)); },
+      () => thread.append(chips),
+      () => { chips.children[chat.pick].classList.add("on"); thread.append(el("div", "msg c", chat.chips[chat.pick])); },
+      () => thread.append(done),
+    ];
+    if (!animate) { [0, 1, 3, 4, 5, 6].forEach((i) => (i === 3 ? thread.append(el("div", "msg b", chat.b1)) : steps[i]())); return () => {}; }
+    const waits = [200, 500, 900, 1300, 700, 1300, 900];
+    let i = 0, timer;
+    const next = () => { if (i < steps.length) { steps[i++](); timer = setTimeout(next, waits[i] || 0); } else if (onDone) timer = setTimeout(onDone, 4000); };
+    timer = setTimeout(next, waits[0]);
+    return () => clearTimeout(timer);
+  }
+
+  // Hero: plays every industry in turn; the dots pick one.
+  const heroPhone = document.getElementById("hero-phone"), dots = document.getElementById("hero-dots");
+  let current = 0, stop = () => {};
+  const show = (n) => {
+    stop(); current = n;
+    [...dots.children].forEach((d, j) => d.setAttribute("aria-pressed", j === n));
+    stop = play(heroPhone, chats[n], !still, () => { if (!document.hidden) show((n + 1) % chats.length); else stop = play(heroPhone, chats[n], false); });
+  };
+  chats.forEach((c, i) => { const d = el("button"); d.type = "button"; d.setAttribute("aria-label", c.tab); d.onclick = () => show(i); dots.append(d); });
+  show(0);
+
+  // Industry tabs: finished conversation + what it does.
+  const tabs = document.getElementById("tabs"), facts = document.getElementById("facts"), tabPhone = document.getElementById("tab-phone");
+  const pick = (n) => {
+    [...tabs.children].forEach((t, j) => { t.setAttribute("aria-selected", j === n); t.tabIndex = j === n ? 0 : -1; });
+    const c = chats[n];
+    facts.replaceChildren();
+    const ask = el("div"); ask.append(el("h3", "", "They ask")); const a = el("div", "asks"); c.asks.forEach((q) => a.append(el("span", "", q))); ask.append(a);
+    const does = el("div"); does.append(el("h3", "", "Halcyo does"), el("p", "", c.does));
+    const never = el("div", "never"); never.append(el("h3", "", "Never does"), el("p", "", c.never));
+    facts.append(ask, does, never);
+    play(tabPhone, c, false);
+  };
+  chats.forEach((c, i) => {
+    const t = el("button", "tab"); t.type = "button"; t.setAttribute("role", "tab");
+    const ic = el("i", "ph " + c.icon); ic.setAttribute("aria-hidden", "true"); t.append(ic, c.tab);
+    t.onclick = () => pick(i);
+    t.onkeydown = (e) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const n = (i + (e.key === "ArrowRight" ? 1 : chats.length - 1)) % chats.length; pick(n); tabs.children[n].focus(); } };
+    tabs.append(t);
+  });
+  pick(0);
+
+  // FAQ
+  const faqs = [
+    ["Will it say wrong things about my fees or services?", "It answers only from your own knowledge file. If it doesn't know, it passes the chat to your staff. Every change is tested before it goes live."],
+    ["Will it give medical or legal advice?", "No. It books appointments, answers questions about your business and hands anything professional to your team."],
+    ["What about customer privacy?", "It never asks for passports, NID, bank statements or medical reports in chat. We follow the Bangladesh Personal Data Protection Act 2026. See our privacy page."],
+    ["Do I need my own Meta app or WhatsApp number?", "We set everything up in your own Business account. You keep ownership."],
+    ["What happens when my staff replies?", "The bot pauses for that chat, so your customer talks to one person at a time."],
+    ["My business isn't listed. Can I use it?", "If you sell a service and take bookings, it very likely fits. Book a demo and ask."],
+  ];
+  const faqEl = document.getElementById("faqs");
+  faqs.forEach(([q, a]) => {
+    const d = el("details"), s = el("summary"); s.append(el("span", "", q)); const ic = el("i", "ph ph-plus"); ic.setAttribute("aria-hidden", "true"); s.append(ic);
+    d.append(s, el("p", "", a)); faqEl.append(d);
+  });
+
+  // Rising speech bubbles in the animated backgrounds.
+  if (!still) document.querySelectorAll(".alive .bg").forEach((bg) => {
+    for (let i = 0; i < 9; i++) {
+      const size = 24 + Math.round(Math.random() * 40);
+      const b = el("div", "bub");
+      b.innerHTML = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 5h20a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H14l-6 5v-5H6a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z"/></svg>';
+      b.style.left = (i * 11 + Math.random() * 8) + "%";
+      b.style.animationDuration = (20 + Math.random() * 20) + "s";
+      b.style.animationDelay = (-Math.random() * 30) + "s";
+      bg.append(b);
+    }
+  });
+  // Pause background motion while the tab is hidden.
+  document.addEventListener("visibilitychange", () =>
+    document.querySelectorAll(".glow, .bub").forEach((g) => (g.style.animationPlayState = document.hidden ? "paused" : "running")));
+})();
+</script>
+</body>
+</html>

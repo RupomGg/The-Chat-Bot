@@ -40,3 +40,5 @@ desktop.ini
 # Business documents: kept on this computer, not in the public repo (owner, 2026-10-07)
 PRD.md
 DECISION.md
+design/LANDING_GUIDE.md
+design/stitch/*.zip

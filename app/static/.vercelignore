@@ -1,0 +1,3 @@
+# Only the public site goes to Vercel; the widget and its test page are served by the app.
+demo.html
+widget.js

@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="web_standard" name="shell-type"/>
+<title>Halcyo — Calm Days for Busy Teams in Dhaka</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Anek+Bangla:wght@400;500;600;700;800&amp;family=Hind+Siliguri:wght@400;500;600;700&amp;family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0..1,0&amp;display=swap" rel="stylesheet"/>
+<style>
+    @layer base {
+      html, body { margin: 0; padding: 0; scroll-behavior: smooth; }
+      body { overscroll-behavior: none; }
+      main > :first-child { margin-top: 0 !important; }
+      main > :last-child { margin-bottom: 0 !important; }
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(116, 118, 134, 0.2); border-radius: 9999px; }
+  </style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-bright": "#f9f9ff",
+            "on-secondary-fixed": "#2b1700",
+            "error": "#ba1a1a",
+            "inverse-surface": "#2e3036",
+            "tertiary-fixed-dim": "#ffb599",
+            "surface-tint": "#2352d5",
+            "secondary": "#885200",
+            "background": "#fbfbf8",
+            "on-error": "#ffffff",
+            "on-secondary-container": "#6d4100",
+            "on-surface": "#1a1b21",
+            "outline": "#747686",
+            "primary-container": "#2453d6",
+            "on-tertiary": "#ffffff",
+            "tertiary-container": "#a73b00",
+            "on-tertiary-fixed-variant": "#7f2b00",
+            "on-surface-variant": "#434654",
+            "secondary-container": "#fdaa41",
+            "on-secondary": "#ffffff",
+            "surface-dim": "#d9d9e0",
+            "on-error-container": "#93000a",
+            "outline-variant": "#c4c5d7",
+            "primary": "#003ab4",
+            "on-primary-container": "#d0d8ff",
+            "tertiary-fixed": "#ffdbce",
+            "on-secondary-fixed-variant": "#673d00",
+            "surface-container-low": "#f4f3ed",
+            "surface": "#fbfbf8",
+            "secondary-fixed-dim": "#ffb867",
+            "on-tertiary-fixed": "#370e00",
+            "surface-container-highest": "#e2e2e9",
+            "surface-container": "#eeede6",
+            "on-primary-fixed": "#001550",
+            "secondary-fixed": "#ffddbb",
+            "on-tertiary-container": "#ffcfbd",
+            "surface-container-high": "#e8e7df",
+            "primary-fixed-dim": "#b6c4ff",
+            "on-background": "#1a1b21",
+            "inverse-primary": "#b6c4ff",
+            "on-primary-fixed-variant": "#003ab2",
+            "on-primary": "#ffffff",
+            "error-container": "#ffdad6",
+            "inverse-on-surface": "#f0f0f7",
+            "tertiary": "#802b00",
+            "primary-fixed": "#dce1ff",
+            "surface-container-lowest": "#ffffff"
+          },
+          fontFamily: {
+            "body-sm": ["Hind Siliguri", "sans-serif"],
+            "body-md": ["Hind Siliguri", "sans-serif"],
+            "body-lg": ["Hind Siliguri", "sans-serif"],
+            "headline-sm": ["Anek Bangla", "sans-serif"],
+            "headline-md": ["Anek Bangla", "sans-serif"],
+            "headline-lg": ["Anek Bangla", "sans-serif"],
+            "display-xl": ["Anek Bangla", "sans-serif"],
+            "label-sm": ["Hind Siliguri", "sans-serif"],
+            "label-md": ["Hind Siliguri", "sans-serif"],
+            "label-lg": ["Hind Siliguri", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-[#fcfbf7] dark:bg-[#0f141c] font-body-md text-[#1a1b21] dark:text-[#edeef6] transition-colors duration-300 antialiased selection:bg-secondary-container selection:text-on-secondary-fixed">
+<!-- Top Navigation Atelier Bar -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-[#fcfbf7]/90 dark:bg-[#0f141c]/90 backdrop-blur-md border-b border-[#e5e3d8] dark:border-[#222938] transition-colors duration-300">
+<div class="h-18 max-w-6xl mx-auto px-6 md:px-8 py-3.5 flex items-center justify-between gap-4">
+<a class="flex items-center gap-2.5 group" href="#">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-bold text-sm tracking-tight shadow-sm">
+          h
+        </div>
+<span class="font-headline-sm text-2xl font-bold lowercase tracking-tight text-on-surface dark:text-[#ffffff]">halcyo</span>
+<span class="hidden sm:inline-block text-[11px] font-label-sm uppercase tracking-wider text-outline dark:text-outline-variant px-2 py-0.5 rounded border border-[#e5e3d8] dark:border-[#2b3346] ml-1">Dhaka Studio</span>
+</a>
+<nav class="hidden md:flex items-center gap-8 text-[15px] font-label-lg font-medium text-on-surface-variant dark:text-[#a6acc2]">
+<a class="hover:text-primary-container dark:hover:text-primary-fixed-dim transition-colors" href="#how-it-works">How it works</a>
+<a class="hover:text-primary-container dark:hover:text-primary-fixed-dim transition-colors" href="#industries">Industries</a>
+<a class="hover:text-primary-container dark:hover:text-primary-fixed-dim transition-colors" href="#demo">Test widget</a>
+<a class="hover:text-primary-container dark:hover:text-primary-fixed-dim transition-colors" href="#pricing">Pricing</a>
+<a class="hover:text-primary-container dark:hover:text-primary-fixed-dim transition-colors" href="#faq">FAQ</a>
+</nav>
+<div class="flex items-center gap-3">
+<!-- Day / Night Calm Atelier Mode Toggle -->
+<button aria-label="Toggle Night Ambient Mode" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-label-md border border-[#dfddd1] dark:border-[#2b3346] bg-white dark:bg-[#18202e] text-on-surface dark:text-[#e2e4f0] shadow-sm hover:border-primary-container transition-all" id="theme-toggle" type="button">
+<span class="material-symbols-outlined text-[16px] text-secondary dark:text-secondary-fixed-dim" id="theme-toggle-icon">bedtime</span>
+<span class="hidden sm:inline" id="theme-toggle-text">11 pm Mode</span>
+</button>
+<a class="inline-flex items-center gap-1.5 bg-primary-container hover:bg-primary text-on-primary font-label-lg text-sm px-5 py-2 rounded-full transition-all shadow-sm" href="https://wa.me/8801966163995?text=Hi,%20I%20saw%20Halcyo%20and%20want%20a%20demo." rel="noopener noreferrer" target="_blank">
+<span>Book a demo</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+</header>
+<main class="w-full pt-20">
+<!-- Hero: Direct Proof & Human Peace of Mind -->
+<section class="relative w-full overflow-hidden pt-12 pb-20 md:pt-20 md:pb-28">
+<div class="max-w-6xl mx-auto px-6 md:px-8">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-14 items-center">
+<!-- Hero Copy Left -->
+<div class="lg:col-span-6 flex flex-col gap-6">
+<div class="inline-flex items-center gap-2 self-start px-3 py-1 rounded-full bg-[#f1efe6] dark:bg-[#1a2232] border border-[#e3dfd0] dark:border-[#2a3449] text-xs font-label-md text-on-surface-variant dark:text-[#a6adc4]">
+<span class="w-2 h-2 rounded-full bg-secondary-container animate-ping"></span>
+<span>Sleep well. Wake up with booked appointments.</span>
+</div>
+<h1 class="font-display-xl text-4xl sm:text-5xl lg:text-[52px] leading-[1.12] tracking-tight font-bold text-on-surface dark:text-[#f8f9ff]">
+              Every customer message answered. <br/>
+<span class="text-primary-container dark:text-primary-fixed-dim">Even at 11 pm.</span>
+</h1>
+<p class="font-body-lg text-lg text-on-surface-variant dark:text-[#b4bacd] leading-relaxed max-w-xl">
+              Halcyo replies on Messenger, WhatsApp and your website in Bangla, Banglish or English, and books appointments for you while your team rests.
+            </p>
+<div class="flex flex-wrap items-center gap-4 pt-1">
+<a class="inline-flex items-center gap-2 bg-primary-container hover:bg-primary text-on-primary font-label-lg text-base px-7 py-3.5 rounded-full shadow-sm hover:shadow-md transition-all" href="https://wa.me/8801966163995?text=Hi,%20I%20saw%20Halcyo%20and%20want%20a%20demo." rel="noopener noreferrer" target="_blank">
+<span class="material-symbols-outlined text-[20px]">chat</span>
+<span>Book a demo on WhatsApp</span>
+</a>
+<a class="inline-flex items-center gap-2 bg-white dark:bg-[#1a2232] border border-[#dfddd0] dark:border-[#2b354c] hover:border-primary-container text-on-surface dark:text-[#e4e7f6] font-label-lg text-base px-6 py-3.5 rounded-full transition-all" href="#demo">
+<span>Try the widget</span>
+</a>
+</div>
+<!-- Authentic Proof Badges -->
+<div class="pt-4 border-t border-[#eeece2] dark:border-[#222a3b] flex flex-wrap items-center gap-6 text-xs font-label-md text-on-surface-variant dark:text-[#8e96ac]">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary-container dark:text-primary-fixed-dim text-[18px]">verified</span>
+<span>No setup fee for first 2 pilots</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[18px]">calendar_today</span>
+<span>Live in your inbox in 5 days</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-outline text-[18px]">security</span>
+<span>Follows BD Data Protection Act</span>
+</div>
+</div>
+</div>
+<!-- Hero Visual Right: Curated Photo & Real Phone Frame -->
+<div class="lg:col-span-6 relative flex flex-col items-center">
+<!-- Curated Desk Photography Frame -->
+<div class="relative w-full rounded-2xl overflow-hidden shadow-lg border border-[#e4e0d2] dark:border-[#263044] bg-[#eae7db] dark:bg-[#161d2a]">
+<img alt="Dhaka team staff member smiling naturally while handling customer messages" class="w-full h-72 sm:h-80 object-cover object-center filter brightness-95" src="https://lh3.googleusercontent.com/aida/AEtjO1WXFBuhB21ru-1KY6ca7WHd5X1VpeWW4eOZrcQ-GIC6SRhaVQ_b4ZJ6rIeufXZO1QnkA5jP9KP4O-PW6I0Z5z2uOR51HN-pI2qA34qFmGjE3fcvH0ALEgw4U5F7x4GvkuVqPrNR6f_M3bBFHjVwlDOYUeyoJQ8u0Qr5Fi4B4bCGlLJZws4hYRrLGSeVwe6Qvz5O5fLB_0z7irJIotAIUovK2V1OoGSTjmMJhJ2kBYdTixqy_U6MwjyjnNrH"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
+<div class="absolute bottom-4 left-5 right-5 text-white flex items-center justify-between text-xs font-label-sm">
+<span class="bg-black/50 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Banani Office · 11:42 pm
+                </span>
+<span class="text-white/80">Owner asleep · Halcyo handling chat</span>
+</div>
+</div>
+<!-- Overlapping Real Phone Chat Frame -->
+<div class="-mt-14 sm:-mt-18 w-[92%] sm:w-[88%] bg-white dark:bg-[#161e2b] rounded-2xl p-5 shadow-2xl border border-[#dedad0] dark:border-[#263044] relative z-20">
+<!-- Chat header -->
+<div class="flex items-center justify-between pb-3 mb-3 border-b border-[#f0eee4] dark:border-[#242c3d]">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full bg-[#eef1ff] dark:bg-[#202942] text-primary dark:text-primary-fixed-dim flex items-center justify-center font-bold text-sm">
+                    H
+                  </div>
+<div>
+<div class="text-xs font-bold text-on-surface dark:text-[#ffffff] leading-none">Halcyo Assistant</div>
+<div class="text-[11px] text-outline dark:text-[#8e96ac] mt-1">Active on WhatsApp &amp; Messenger</div>
+</div>
+</div>
+<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-[#ffedd5] dark:bg-[#3d2714] text-[#885200] dark:text-[#ffb867]">
+                  Instant reply
+                </span>
+</div>
+<!-- Chat bubble stream -->
+<div class="space-y-3 text-xs sm:text-[13px]">
+<!-- Lead Message -->
+<div class="flex justify-end">
+<div class="bg-[#f0eee4] dark:bg-[#252f42] text-on-surface dark:text-[#eaecf6] px-3.5 py-2.5 rounded-2xl rounded-tr-none max-w-[85%] leading-relaxed shadow-sm">
+                    UK te IELTS 6 hole hobe? Total koto lagbe?
+                    <div class="text-[9px] text-right text-outline dark:text-[#8e96ac] mt-1">11:42 pm</div>
+</div>
+</div>
+<!-- Halcyo Reply -->
+<div class="flex justify-start">
+<div class="bg-[#eef2ff] dark:bg-[#1d273f] text-[#0f1f4b] dark:text-[#d7e0ff] px-3.5 py-2.5 rounded-2xl rounded-tl-none max-w-[90%] leading-relaxed shadow-sm border border-[#dce4ff] dark:border-[#2b3a5d]">
+                    IELTS 6.0 (kono band 5.5 er niche na) hole amader partner university te Bachelor e apply kora jay. Total khoroch city ar university r upor depend kore, counsellor apnake exact hishab diye dibe. Free counselling book korbo?
+                    <div class="text-[9px] text-outline dark:text-[#8e96ac] mt-1">11:43 pm</div>
+</div>
+</div>
+<!-- Verified Booking Banner -->
+<div class="bg-[#faf8f0] dark:bg-[#1a2333] border border-[#f3ead3] dark:border-[#383321] rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded-full bg-[#fdaa41]/20 text-[#885200] dark:text-[#ffb867] flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px]">event_available</span>
+</div>
+<div>
+<div class="font-bold text-xs text-on-surface dark:text-[#ffffff]">Counselling Confirmed</div>
+<div class="text-[10px] text-on-surface-variant dark:text-[#a0a7bc]">Kal 11:00 am · Banani Branch</div>
+</div>
+</div>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-secondary-container text-on-secondary-fixed">
+                    Logged to CRM
+                  </span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- The 3 Honest Truths of Dhaka Inboxes (Humanized) -->
+<section class="w-full bg-[#f5f3eb] dark:bg-[#131a26] py-16 transition-colors duration-300 border-y border-[#eae6d8] dark:border-[#1e2636]">
+<div class="max-w-6xl mx-auto px-6 md:px-8">
+<div class="max-w-2xl mb-10">
+<span class="font-label-md text-xs font-bold uppercase tracking-wider text-secondary dark:text-secondary-fixed-dim">Reality on the Ground</span>
+<h2 class="font-headline-lg text-2xl sm:text-3xl font-bold mt-1 text-on-surface dark:text-[#f8f9ff]">Why Dhaka businesses lose warm customers.</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-white dark:bg-[#182130] p-6 rounded-xl border border-[#e4e0d4] dark:border-[#242e42] flex flex-col justify-between">
+<div class="space-y-3">
+<span class="material-symbols-outlined text-secondary text-3xl">hourglass_empty</span>
+<h3 class="font-headline-sm text-lg font-bold text-on-surface dark:text-[#ffffff]">"Typically replies within a day"</h3>
+<p class="font-body-md text-sm text-on-surface-variant dark:text-[#a9b1c7] leading-relaxed">
+                Customers do not wait 24 hours. When they ask about fees or appointments, they message three competitors in the next 10 minutes.
+              </p>
+</div>
+<div class="mt-4 pt-3 border-t border-[#f0ede1] dark:border-[#222c3e] text-xs font-semibold text-primary dark:text-primary-fixed-dim">
+              Halcyo cuts first response to 15 seconds.
+            </div>
+</div>
+<div class="bg-white dark:bg-[#182130] p-6 rounded-xl border border-[#e4e0d4] dark:border-[#242e42] flex flex-col justify-between">
+<div class="space-y-3">
+<span class="material-symbols-outlined text-primary-container dark:text-primary-fixed-dim text-3xl">nights_stay</span>
+<h3 class="font-headline-sm text-lg font-bold text-on-surface dark:text-[#ffffff]">The 8 pm to midnight rush</h3>
+<p class="font-body-md text-sm text-on-surface-variant dark:text-[#a9b1c7] leading-relaxed">
+                Most messages in Bangladesh arrive after office hours and on Fridays when families browse together at home. Your staff is rightfully resting.
+              </p>
+</div>
+<div class="mt-4 border-t border-[#f0ede1] dark:border-[#222c3e] pt-3 text-xs font-semibold text-secondary dark:text-secondary-fixed-dim">
+              Never miss evening intent again.
+            </div>
+</div>
+<div class="bg-white dark:bg-[#182130] p-6 rounded-xl border border-[#e4e0d4] dark:border-[#242e42] flex flex-col justify-between">
+<div class="space-y-3">
+<span class="material-symbols-outlined text-[#802b00] dark:text-[#ffb599] text-3xl">receipt_long</span>
+<h3 class="font-headline-sm text-lg font-bold text-on-surface dark:text-[#ffffff]">Expensive ads with zero clarity</h3>
+<p class="font-body-md text-sm text-on-surface-variant dark:text-[#a9b1c7] leading-relaxed">
+                You run boosted posts and ads, but have no clean attribution of which campaign actually resulted in a verified desk appointment.
+              </p>
+</div>
+<div class="mt-4 border-t border-[#f0ede1] dark:border-[#222c3e] pt-3 text-xs font-semibold text-primary dark:text-primary-fixed-dim">
+              Attribution tracked right to the booking.
+            </div>
+</div>
+</div>
+</div>
+</section>
+<!-- Industries Section: Tailored Rules & Boundary Safety -->
+<section class="w-full py-20" id="industries">
+<div class="max-w-6xl mx-auto px-6 md:px-8">
+<div class="text-center max-w-2xl mx-auto mb-10">
+<span class="font-label-md text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-fixed-dim">Tailored Rules</span>
+<h2 class="font-headline-lg text-3xl sm:text-4xl font-bold mt-1 text-on-surface dark:text-[#ffffff]">Made for businesses that sell time, care or advice.</h2>
+<p class="font-body-md text-sm text-on-surface-variant dark:text-[#a6acc2] mt-2">
+            Every business has strict professional boundaries. Halcyo is instructed with exactly what it does, and what it must never do.
+          </p>
+</div>
+<!-- Industry Selector Tabs -->
+<div class="flex items-center justify-center flex-wrap gap-2.5 mb-8" id="industry-tabs">
+<button class="industry-tab px-5 py-2 rounded-full font-label-md text-sm font-semibold transition-all bg-primary-container text-on-primary shadow-sm" data-industry="abroad" type="button">
+            Study Abroad
+          </button>
+<button class="industry-tab px-5 py-2 rounded-full font-label-md text-sm font-semibold transition-all bg-[#eeece1] dark:bg-[#1f2839] text-on-surface-variant dark:text-[#a6acc2] hover:bg-[#e4e1d4]" data-industry="pets" type="button">
+            Pet Care &amp; Grooming
+          </button>
+<button class="industry-tab px-5 py-2 rounded-full font-label-md text-sm font-semibold transition-all bg-[#eeece1] dark:bg-[#1f2839] text-on-surface-variant dark:text-[#a6acc2] hover:bg-[#e4e1d4]" data-industry="clinics" type="button">
+            Clinics &amp; Diagnostics
+          </button>
+<button class="industry-tab px-5 py-2 rounded-full font-label-md text-sm font-semibold transition-all bg-[#eeece1] dark:bg-[#1f2839] text-on-surface-variant dark:text-[#a6acc2] hover:bg-[#e4e1d4]" data-industry="law" type="button">
+            Law Chambers &amp; Consultancies
+          </button>
+</div>
+<!-- Panel 1: Abroad -->
+<div class="industry-content bg-white dark:bg-[#161f2c] rounded-2xl p-6 sm:p-10 border border-[#e5e1d4] dark:border-[#252f42] shadow-sm grid grid-cols-1 lg:grid-cols-12 gap-8 items-center" id="abroad-panel">
+<div class="lg:col-span-5 space-y-4">
+<span class="text-xs font-bold tracking-wider uppercase text-outline dark:text-[#8e96ac]">Real Inquiries Handled</span>
+<div class="flex flex-col gap-2">
+<div class="bg-[#f7f5ed] dark:bg-[#20293a] p-3 rounded-xl text-xs font-medium text-on-surface dark:text-[#e4e7f6] border border-[#eae6d8] dark:border-[#2a3449]">
+                "UK te IELTS 6 hole hobe? Total koto lagbe?"
+              </div>
+<div class="bg-[#f7f5ed] dark:bg-[#20293a] p-3 rounded-xl text-xs font-medium text-on-surface dark:text-[#e4e7f6] border border-[#eae6d8] dark:border-[#2a3449]">
+                "January intake e ekhono apply kora jabe?"
+              </div>
+<div class="bg-[#f7f5ed] dark:bg-[#20293a] p-3 rounded-xl text-xs font-medium text-on-surface dark:text-[#e4e7f6] border border-[#eae6d8] dark:border-[#2a3449]">
+                "Bank solvency koto lakh dekhano lagbe?"
+              </div>
+</div>
+</div>
+<div class="lg:col-span-7 space-y-4">
+<div class="p-4 rounded-xl bg-[#eef2ff] dark:bg-[#1a253e] border border-[#d8e2ff] dark:border-[#28375b]">
+<span class="text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-fixed-dim">Halcyo Does</span>
+<p class="text-sm text-on-surface dark:text-[#e3e7f8] mt-1 leading-relaxed">
+                Answers strictly from your approved partner fees and rules. Collects academic history, IELTS score, study gap, budget and target intake, then books the consultation.
+              </p>
+</div>
+<div class="p-4 rounded-xl bg-[#fff8f0] dark:bg-[#2a2118] border border-[#ffe0bd] dark:border-[#423120]">
+<span class="text-xs font-bold uppercase tracking-wider text-secondary dark:text-secondary-fixed-dim">Never Does</span>
+<p class="text-sm text-[#5d3b07] dark:text-[#ffdbce] mt-1 leading-relaxed">
+                Never gives visa guarantees or calculates visa odds. Real cases are handed directly to your senior counsellor.
+              </p>
+</div>
+</div>
+</div>
+<!-- Panel 2: Pets -->
+<div class="industry-content hidden bg-white dark:bg-[#161f2c] rounded-2xl p-6 sm:p-10 border border-[#e5e1d4] dark:border-[#252f42] shadow-sm grid grid-cols-1 lg:grid-cols-12 gap-8 items-center" id="pets-panel">
+<div class="lg:col-span-5 space-y-4">
+<span class="text-xs font-bold tracking-wider uppercase text-outline dark:text-[#8e96ac]">Real Inquiries Handled</span>
+<div class="flex flex-col gap-2">
+<div class="bg-[#f7f5ed] dark:bg-[#20293a] p-3 rounded-xl text-xs font-medium text-on-surface dark:text-[#e4e7f6] border border-[#eae6d8] dark:border-[#2a3449]">
+                "Bilai bath &amp; hair cut package koto?"
+              </div>
+<div class="bg-[#f7f5ed] dark:bg-[#20293a] p-3 rounded-xl text-xs font-medium text-on-surface dark:text-[#e4e7f6] border border-[#eae6d8] dark:border-[#2a3449]">
+                "Rabies vaccine ar deworming available ase?"
+              </div>
+<div class="bg-[#f7f5ed] dark:bg-[#20293a] p-3 rounded-xl text-xs font-medium text-on-surface dark:text-[#e4e7f6] border border-[#eae6d8] dark:border-[#2a3449]">
+                "Friday te slot faka ase?"
+              </div>
+</div>
+</div>
+<div class="lg:col-span-7 space-y-4">
+<div class="p-4 rounded-xl bg-[#eef2ff] dark:bg-[#1a253e] border border-[#d8e2ff] dark:border-[#28375b]">
+<span class="text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-fixed-dim">Halcyo Does</span>
+<p class="text-sm text-on-surface dark:text-[#e3e7f8] mt-1 leading-relaxed">
+                Explains grooming packages, checks pet weight or breed requirements, asks about vaccine history, and confirms grooming slots to prevent salon overcrowding.
+              </p>
+</div>
+<div class="p-4 rounded-xl bg-[#fff8f0] dark:bg-[#2a2118] border border-[#ffe0bd] dark:border-[#423120]">
+<span class="text-xs font-bold uppercase tracking-wider text-secondary dark:text-secondary-fixed-dim">Never Does</span>
+<p class="text-sm text-[#5d3b07] dark:text-[#ffdbce] mt-1 leading-relaxed">
+                Never diagnoses sick pets or recommends medication. Emergency inquiries transfer immediately to the duty veterinarian.
+              </p>
+</div>
+</div>
+</div>
+<!-- Panel 3: Clinics -->
+<div class="industry-content hidden bg-white dark:bg-[#161f2c] rounded-2xl p-6 sm:p-10 border border-[#e5e1d4] dark:border-[#252f42] shadow-sm grid grid-cols-1 lg:grid-cols-12 gap-8 items-center" id="clinics-panel">
+<div class="lg:col-span-5 space-y-4">
+<span class="text-xs font-bold tracking-wider uppercase text-outline dark:text-[#8e96ac]">Real Inquiries Handled</span>
+<div class="flex flex-col gap-2">
+<div class="bg-[#f7f5ed] dark:bg-[#20293a] p-3 rounded-xl text-xs font-medium text-on-surface dark:text-[#e4e7f6] border border-[#eae6d8] dark:border-[#2a3449]">
+                "Doctor consultation fee koto?"
+              </div>
+<div class="bg-[#f7f5ed] dark:bg-[#20293a] p-3 rounded-xl text-xs font-medium text-on-surface dark:text-[#e4e7f6] border border-[#eae6d8] dark:border-[#2a3449]">
+                "MRI test Friday shokal e kora jabe?"
+              </div>
+<div class="bg-[#f7f5ed] dark:bg-[#20293a] p-3 rounded-xl text-xs font-medium text-on-surface dark:text-[#e4e7f6] border border-[#eae6d8] dark:border-[#2a3449]">
+                "Serial kivabe pabo?"
+              </div>
+</div>
+</div>
+<div class="lg:col-span-7 space-y-4">
+<div class="p-4 rounded-xl bg-[#eef2ff] dark:bg-[#1a253e] border border-[#d8e2ff] dark:border-[#28375b]">
+<span class="text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-fixed-dim">Halcyo Does</span>
+<p class="text-sm text-on-surface dark:text-[#e3e7f8] mt-1 leading-relaxed">
+                Shares doctor duty days, test prerequisites (such as 10-hour fasting), branch address details, and books official consultation serials.
+              </p>
+</div>
+<div class="p-4 rounded-xl bg-[#fff8f0] dark:bg-[#2a2118] border border-[#ffe0bd] dark:border-[#423120]">
+<span class="text-xs font-bold uppercase tracking-wider text-secondary dark:text-secondary-fixed-dim">Never Does</span>
+<p class="text-sm text-[#5d3b07] dark:text-[#ffdbce] mt-1 leading-relaxed">
+                Never prescribes medication or interprets lab test reports in chat.
+              </p>
+</div>
+</div>
+</div>
+<!-- Panel 4: Law -->
+<div class="industry-content hidden bg-white dark:bg-[#161f2c] rounded-2xl p-6 sm:p-10 border border-[#e5e1d4] dark:border-[#252f42] shadow-sm grid grid-cols-1 lg:grid-cols-12 gap-8 items-center" id="law-panel">
+<div class="lg:col-span-5 space-y-4">
+<span class="text-xs font-bold tracking-wider uppercase text-outline dark:text-[#8e96ac]">Real Inquiries Handled</span>
+<div class="flex flex-col gap-2">
+<div class="bg-[#f7f5ed] dark:bg-[#20293a] p-3 rounded-xl text-xs font-medium text-on-surface dark:text-[#e4e7f6] border border-[#eae6d8] dark:border-[#2a3449]">
+                "Property dispute consult fee koto?"
+              </div>
+<div class="bg-[#f7f5ed] dark:bg-[#20293a] p-3 rounded-xl text-xs font-medium text-on-surface dark:text-[#e4e7f6] border border-[#eae6d8] dark:border-[#2a3449]">
+                "Chamber er address ta diben?"
+              </div>
+<div class="bg-[#f7f5ed] dark:bg-[#20293a] p-3 rounded-xl text-xs font-medium text-on-surface dark:text-[#e4e7f6] border border-[#eae6d8] dark:border-[#2a3449]">
+                "Online consultation hoy?"
+              </div>
+</div>
+</div>
+<div class="lg:col-span-7 space-y-4">
+<div class="p-4 rounded-xl bg-[#eef2ff] dark:bg-[#1a253e] border border-[#d8e2ff] dark:border-[#28375b]">
+<span class="text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-fixed-dim">Halcyo Does</span>
+<p class="text-sm text-on-surface dark:text-[#e3e7f8] mt-1 leading-relaxed">
+                Explains standard consultation retainers, collects matter summary, schedules chamber meetings and sends appointment reminders with location map.
+              </p>
+</div>
+<div class="p-4 rounded-xl bg-[#fff8f0] dark:bg-[#2a2118] border border-[#ffe0bd] dark:border-[#423120]">
+<span class="text-xs font-bold uppercase tracking-wider text-secondary dark:text-secondary-fixed-dim">Never Does</span>
+<p class="text-sm text-[#5d3b07] dark:text-[#ffdbce] mt-1 leading-relaxed">
+                Never gives legal opinions or evaluates outcome chances in chat.
+              </p>
+</div>
+</div>
+</div>
+<p class="text-center text-xs text-on-surface-variant dark:text-[#8e96ac] mt-6">
+          Different business? If you sell a service and take bookings, Halcyo fits. <a class="text-primary dark:text-primary-fixed-dim font-bold underline" href="https://wa.me/8801966163995">Ask our team</a>.
+        </p>
+</div>
+</section>
+<!-- Interactive Live Widget Test Sandbox -->
+<section class="w-full bg-[#f4f2e8] dark:bg-[#121924] py-16 transition-colors duration-300 border-t border-[#e6e2d4] dark:border-[#1e2636]" id="demo">
+<div class="max-w-3xl mx-auto px-6 md:px-8">
+<div class="text-center mb-8">
+<span class="font-label-md text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-fixed-dim">Interactive Proof</span>
+<h2 class="font-headline-lg text-2xl sm:text-3xl font-bold mt-1 text-on-surface dark:text-[#ffffff]">Ask it something your customer would ask.</h2>
+<p class="font-body-md text-sm text-on-surface-variant dark:text-[#a6acc2] mt-1">
+            This demo is configured for an education consultancy in Banani. Type in Bangla, Banglish or English.
+          </p>
+</div>
+<div class="bg-white dark:bg-[#17202d] rounded-2xl p-5 sm:p-6 shadow-md border border-[#e2ded0] dark:border-[#253043] flex flex-col gap-4">
+<!-- Prompt Chips -->
+<div class="flex flex-wrap items-center gap-2">
+<span class="text-xs font-bold text-outline dark:text-[#8e96ac]">Click sample:</span>
+<button class="px-3 py-1 rounded-full bg-[#f1eee2] dark:bg-[#202a3a] text-xs font-medium text-on-surface dark:text-[#dce0ee] hover:bg-primary-container hover:text-white transition-all" onclick="insertPrompt('Fees koto?')" type="button">
+              Fees koto?
+            </button>
+<button class="px-3 py-1 rounded-full bg-[#f1eee2] dark:bg-[#202a3a] text-xs font-medium text-on-surface dark:text-[#dce0ee] hover:bg-primary-container hover:text-white transition-all" onclick="insertPrompt('Appointment book korbo')" type="button">
+              Appointment book korbo
+            </button>
+<button class="px-3 py-1 rounded-full bg-[#f1eee2] dark:bg-[#202a3a] text-xs font-medium text-on-surface dark:text-[#dce0ee] hover:bg-primary-container hover:text-white transition-all" onclick="insertPrompt('Address kothay?')" type="button">
+              Address kothay?
+            </button>
+</div>
+<!-- Chat Log Window -->
+<div class="min-h-[220px] max-h-[320px] overflow-y-auto space-y-3 p-4 bg-[#fbf9f2] dark:bg-[#101620] rounded-xl border border-[#ece8dc] dark:border-[#1d2636]" id="interactive-chat-log">
+<div class="flex justify-start">
+<div class="bg-[#eef2ff] dark:bg-[#1d273f] text-[#0f1f4b] dark:text-[#d7e0ff] px-4 py-2.5 rounded-2xl rounded-tl-none text-xs sm:text-sm leading-relaxed max-w-[88%] shadow-sm">
+                Assalamu Alaikum! Amader UK, USA, Canada ar Australia te file opening free. Ki bhabe help korte pari?
+              </div>
+</div>
+</div>
+<!-- Input Form -->
+<form class="flex items-center gap-2 pt-1" id="interactive-chat-form">
+<input class="flex-1 bg-[#fbf9f2] dark:bg-[#101620] border border-[#ded9cb] dark:border-[#273247] rounded-full px-5 py-3 text-xs sm:text-sm text-on-surface dark:text-[#ffffff] focus:outline-none focus:border-primary-container transition-all" id="interactive-input" placeholder="Type here in Banglish, Bangla or English..." type="text"/>
+<button aria-label="Send test message" class="w-11 h-11 rounded-full bg-primary-container hover:bg-primary text-on-primary flex items-center justify-center shrink-0 shadow-sm transition-all" type="submit">
+<span class="material-symbols-outlined text-[20px]">send</span>
+</button>
+</form>
+</div>
+</div>
+</section>
+<!-- How It Works: Direct 6-Step Workflow -->
+<section class="w-full py-20" id="how-it-works">
+<div class="max-w-6xl mx-auto px-6 md:px-8">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
+<div class="lg:col-span-5 lg:sticky lg:top-28 self-start space-y-5">
+<span class="font-label-md text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-fixed-dim">Simple Workflow</span>
+<h2 class="font-headline-lg text-3xl sm:text-4xl font-bold leading-tight text-on-surface dark:text-[#ffffff]">
+              From a message at night to a booking by morning.
+            </h2>
+<p class="font-body-lg text-base text-on-surface-variant dark:text-[#a6acc2] leading-relaxed">
+              You see every conversation in one inbox. Reply whenever you wish, and the bot steps back automatically.
+            </p>
+<div class="pt-2">
+<a class="inline-flex items-center gap-2 bg-primary-container hover:bg-primary text-on-primary font-label-lg text-sm px-6 py-3 rounded-full shadow-sm transition-all" href="https://wa.me/8801966163995?text=Hi,%20I%20saw%20Halcyo%20and%20want%20a%20demo." rel="noopener noreferrer" target="_blank">
+<span>Book a walkthrough</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<div class="lg:col-span-7 space-y-4">
+<div class="p-5 rounded-xl bg-white dark:bg-[#161f2d] border border-[#e6e2d5] dark:border-[#232d3f] flex items-start gap-4 shadow-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary font-bold text-sm flex items-center justify-center shrink-0">1</div>
+<div>
+<h3 class="font-headline-sm text-base font-bold text-on-surface dark:text-[#ffffff]">Answers</h3>
+<p class="font-body-md text-sm text-on-surface-variant dark:text-[#a6acc2] mt-0.5">Your common questions, only from your own fees, timings and rules.</p>
+</div>
+</div>
+<div class="p-5 rounded-xl bg-white dark:bg-[#161f2d] border border-[#e6e2d5] dark:border-[#232d3f] flex items-start gap-4 shadow-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary font-bold text-sm flex items-center justify-center shrink-0">2</div>
+<div>
+<h3 class="font-headline-sm text-base font-bold text-on-surface dark:text-[#ffffff]">Learns</h3>
+<p class="font-body-md text-sm text-on-surface-variant dark:text-[#a6acc2] mt-0.5">What you need about each customer while chatting. Never a rigid form.</p>
+</div>
+</div>
+<div class="p-5 rounded-xl bg-white dark:bg-[#161f2d] border border-[#e6e2d5] dark:border-[#232d3f] flex items-start gap-4 shadow-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary font-bold text-sm flex items-center justify-center shrink-0">3</div>
+<div>
+<h3 class="font-headline-sm text-base font-bold text-on-surface dark:text-[#ffffff]">Scores</h3>
+<p class="font-body-md text-sm text-on-surface-variant dark:text-[#a6acc2] mt-0.5">Each lead hot, warm or cold based on budget, readiness and timeline.</p>
+</div>
+</div>
+<div class="p-5 rounded-xl bg-white dark:bg-[#161f2d] border border-[#e6e2d5] dark:border-[#232d3f] flex items-start gap-4 shadow-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary font-bold text-sm flex items-center justify-center shrink-0">4</div>
+<div>
+<h3 class="font-headline-sm text-base font-bold text-on-surface dark:text-[#ffffff]">Books</h3>
+<p class="font-body-md text-sm text-on-surface-variant dark:text-[#a6acc2] mt-0.5">The appointment at your branch or online, avoiding calendar collisions.</p>
+</div>
+</div>
+<div class="p-5 rounded-xl bg-white dark:bg-[#161f2d] border border-[#e6e2d5] dark:border-[#232d3f] flex items-start gap-4 shadow-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary font-bold text-sm flex items-center justify-center shrink-0">5</div>
+<div>
+<h3 class="font-headline-sm text-base font-bold text-on-surface dark:text-[#ffffff]">Alerts</h3>
+<p class="font-body-md text-sm text-on-surface-variant dark:text-[#a6acc2] mt-0.5">Your staff within 30 seconds when a hot lead or booking comes in, with the chat summary and the ad it came from.</p>
+</div>
+</div>
+<div class="p-5 rounded-xl bg-white dark:bg-[#161f2d] border border-[#e6e2d5] dark:border-[#232d3f] flex items-start gap-4 shadow-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary font-bold text-sm flex items-center justify-center shrink-0">6</div>
+<div>
+<h3 class="font-headline-sm text-base font-bold text-on-surface dark:text-[#ffffff]">Hands over</h3>
+<p class="font-body-md text-sm text-on-surface-variant dark:text-[#a6acc2] mt-0.5">To a person when the customer asks, or when a question needs a professional.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Transparent Pricing Table + Pilot 50% Banner -->
+<section class="w-full bg-[#f6f4ec] dark:bg-[#131b26] py-20 border-t border-[#e8e4d6] dark:border-[#1e2636]" id="pricing">
+<div class="max-w-6xl mx-auto px-6 md:px-8">
+<div class="text-center max-w-xl mx-auto mb-12">
+<span class="font-label-md text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-fixed-dim">Transparent Investment</span>
+<h2 class="font-headline-lg text-3xl sm:text-4xl font-bold mt-1 text-on-surface dark:text-[#ffffff]">Simple monthly plans.</h2>
+<p class="font-body-md text-sm text-on-surface-variant dark:text-[#a6acc2] mt-1">No complicated software tiers. Zero tech burden on your team.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch mb-8">
+<!-- Starter -->
+<div class="bg-white dark:bg-[#182130] p-6 rounded-2xl border border-[#dedad0] dark:border-[#242e42] flex flex-col justify-between shadow-sm">
+<div>
+<h3 class="font-headline-sm text-lg font-bold text-on-surface dark:text-[#ffffff]">Starter</h3>
+<div class="text-3xl font-extrabold text-on-surface dark:text-[#ffffff] my-3">
+                ৳12,000 <span class="text-xs font-normal text-on-surface-variant dark:text-[#8e96ac]">/ month</span>
+</div>
+<ul class="space-y-2.5 text-xs text-on-surface-variant dark:text-[#b4bacd] pt-2">
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> 500 conversations a month</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> Messenger and website</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> 3 staff seats</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> Booking scheduling</li>
+</ul>
+</div>
+<div class="pt-6">
+<a class="w-full inline-flex items-center justify-center bg-[#f0ede2] dark:bg-[#20293b] hover:bg-primary-container hover:text-white text-on-surface dark:text-[#eaecf6] font-label-md text-xs py-3 rounded-full transition-all" href="https://wa.me/8801966163995?text=Hi,%20I%20am%20interested%20in%20Halcyo%20Starter%20plan." rel="noopener noreferrer" target="_blank">
+                Select Starter
+              </a>
+</div>
+</div>
+<!-- Growth (Most Chosen) -->
+<div class="bg-white dark:bg-[#182130] p-6 rounded-2xl border-2 border-primary-container dark:border-primary-fixed-dim flex flex-col justify-between shadow-md relative">
+<div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-container text-white px-3 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase">
+              Most Chosen in Dhaka
+            </div>
+<div>
+<h3 class="font-headline-sm text-lg font-bold text-primary dark:text-primary-fixed-dim">Growth</h3>
+<div class="text-3xl font-extrabold text-on-surface dark:text-[#ffffff] my-3">
+                ৳25,000 <span class="text-xs font-normal text-on-surface-variant dark:text-[#8e96ac]">/ month</span>
+</div>
+<ul class="space-y-2.5 text-xs text-on-surface-variant dark:text-[#b4bacd] pt-2">
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> 1,500 conversations a month</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> Messenger, WhatsApp, Telegram, website</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> 10 staff seats</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> Ad attribution tracking</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> Lead scoring &amp; reports</li>
+</ul>
+</div>
+<div class="pt-6">
+<a class="w-full inline-flex items-center justify-center bg-primary-container hover:bg-primary text-on-primary font-label-md text-xs py-3 rounded-full shadow-sm transition-all" href="https://wa.me/8801966163995?text=Hi,%20I%20am%20interested%20in%20Halcyo%20Growth%20plan." rel="noopener noreferrer" target="_blank">
+                Select Growth
+              </a>
+</div>
+</div>
+<!-- Scale -->
+<div class="bg-white dark:bg-[#182130] p-6 rounded-2xl border border-[#dedad0] dark:border-[#242e42] flex flex-col justify-between shadow-sm">
+<div>
+<h3 class="font-headline-sm text-lg font-bold text-on-surface dark:text-[#ffffff]">Scale</h3>
+<div class="text-3xl font-extrabold text-on-surface dark:text-[#ffffff] my-3">
+                ৳45,000 <span class="text-xs font-normal text-on-surface-variant dark:text-[#8e96ac]">/ month</span>
+</div>
+<ul class="space-y-2.5 text-xs text-on-surface-variant dark:text-[#b4bacd] pt-2">
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> 4,000 conversations a month</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> All channels &amp; multiple branches</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> Unlimited staff seats</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> CRM integration</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-base">check</span> Priority phone support</li>
+</ul>
+</div>
+<div class="pt-6">
+<a class="w-full inline-flex items-center justify-center bg-[#f0ede2] dark:bg-[#20293b] hover:bg-primary-container hover:text-white text-on-surface dark:text-[#eaecf6] font-label-md text-xs py-3 rounded-full transition-all" href="https://wa.me/8801966163995?text=Hi,%20I%20am%20interested%20in%20Halcyo%20Scale%20plan." rel="noopener noreferrer" target="_blank">
+                Select Scale
+              </a>
+</div>
+</div>
+</div>
+<p class="text-center text-xs text-outline dark:text-[#8e96ac] mb-8">
+          Setup ৳25,000 once. WhatsApp message fees are billed by Meta directly to your account.
+        </p>
+<!-- Pilot Banner (Warm Humanist Direct Proof) -->
+<div class="bg-[#fcedd7] dark:bg-[#2d2217] border border-[#f5d5ac] dark:border-[#483420] p-6 sm:p-8 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm">
+<div class="space-y-1 text-center sm:text-left">
+<span class="inline-block px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-secondary-container text-on-secondary-fixed">
+              Dhaka Pilot Cohort
+            </span>
+<h3 class="font-headline-sm text-lg sm:text-xl font-bold text-[#442700] dark:text-[#ffddbb]">
+              The first 2 businesses get setup free and 50% off for 3 months.
+            </h3>
+<p class="text-xs text-[#6e4612] dark:text-[#ffcfbd]">We write your knowledge base, connect your pages, and verify live test messages together.</p>
+</div>
+<a class="bg-primary-container hover:bg-primary text-on-primary font-label-md text-sm px-6 py-3 rounded-full shrink-0 shadow-sm transition-all" href="https://wa.me/8801966163995?text=Hi,%20I%20want%20to%20claim%20the%20Halcyo%20pilot%20offer." rel="noopener noreferrer" target="_blank">
+            Claim Pilot Offer
+          </a>
+</div>
+</div>
+</section>
+<!-- FAQ Section -->
+<section class="w-full py-20" id="faq">
+<div class="max-w-4xl mx-auto px-6 md:px-8">
+<div class="text-center mb-10">
+<span class="font-label-md text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-fixed-dim">Clarity &amp; Trust</span>
+<h2 class="font-headline-lg text-2xl sm:text-3xl font-bold mt-1 text-on-surface dark:text-[#ffffff]">Questions owners ask.</h2>
+</div>
+<div class="space-y-3">
+<details class="group bg-white dark:bg-[#161f2c] p-5 rounded-xl border border-[#e4e0d4] dark:border-[#242e42] cursor-pointer shadow-sm">
+<summary class="flex items-center justify-between text-sm font-bold text-on-surface dark:text-[#ffffff] list-none">
+<span>Will it say wrong things about my fees or services?</span>
+<span class="material-symbols-outlined text-outline group-open:rotate-45 transition-transform text-lg">add</span>
+</summary>
+<p class="text-xs sm:text-sm text-on-surface-variant dark:text-[#a6acc2] pt-3 leading-relaxed">
+              It answers only from your own knowledge file. If it doesn't know, it passes the chat to your staff. Every change is tested before it goes live.
+            </p>
+</details>
+<details class="group bg-white dark:bg-[#161f2c] p-5 rounded-xl border border-[#e4e0d4] dark:border-[#242e42] cursor-pointer shadow-sm">
+<summary class="flex items-center justify-between text-sm font-bold text-on-surface dark:text-[#ffffff] list-none">
+<span>Will it give medical or legal advice?</span>
+<span class="material-symbols-outlined text-outline group-open:rotate-45 transition-transform text-lg">add</span>
+</summary>
+<p class="text-xs sm:text-sm text-on-surface-variant dark:text-[#a6acc2] pt-3 leading-relaxed">
+              No. It books appointments, answers questions about your business and hands anything professional to your team.
+            </p>
+</details>
+<details class="group bg-white dark:bg-[#161f2c] p-5 rounded-xl border border-[#e4e0d4] dark:border-[#242e42] cursor-pointer shadow-sm">
+<summary class="flex items-center justify-between text-sm font-bold text-on-surface dark:text-[#ffffff] list-none">
+<span>What about customer privacy?</span>
+<span class="material-symbols-outlined text-outline group-open:rotate-45 transition-transform text-lg">add</span>
+</summary>
+<p class="text-xs sm:text-sm text-on-surface-variant dark:text-[#a6acc2] pt-3 leading-relaxed">
+              It never asks for passports, NID, bank statements or medical reports in chat. We follow the Bangladesh Personal Data Protection Act 2026.
+            </p>
+</details>
+<details class="group bg-white dark:bg-[#161f2c] p-5 rounded-xl border border-[#e4e0d4] dark:border-[#242e42] cursor-pointer shadow-sm">
+<summary class="flex items-center justify-between text-sm font-bold text-on-surface dark:text-[#ffffff] list-none">
+<span>Do I need my own Meta app or WhatsApp number?</span>
+<span class="material-symbols-outlined text-outline group-open:rotate-45 transition-transform text-lg">add</span>
+</summary>
+<p class="text-xs sm:text-sm text-on-surface-variant dark:text-[#a6acc2] pt-3 leading-relaxed">
+              We set everything up in your own Business account. You keep complete ownership.
+            </p>
+</details>
+<details class="group bg-white dark:bg-[#161f2c] p-5 rounded-xl border border-[#e4e0d4] dark:border-[#242e42] cursor-pointer shadow-sm">
+<summary class="flex items-center justify-between text-sm font-bold text-on-surface dark:text-[#ffffff] list-none">
+<span>What happens when my staff replies?</span>
+<span class="material-symbols-outlined text-outline group-open:rotate-45 transition-transform text-lg">add</span>
+</summary>
+<p class="text-xs sm:text-sm text-on-surface-variant dark:text-[#a6acc2] pt-3 leading-relaxed">
+              The bot pauses for that chat, so your customer talks to one person at a time.
+            </p>
+</details>
+</div>
+</div>
+</section>
+<!-- Founder Note Section -->
+<section class="w-full bg-[#f6f4ec] dark:bg-[#131b26] py-16 border-t border-[#e8e4d6] dark:border-[#1e2636]">
+<div class="max-w-3xl mx-auto px-6 md:px-8">
+<div class="bg-white dark:bg-[#161f2c] p-6 sm:p-8 rounded-2xl border border-[#e5e1d4] dark:border-[#242e42] flex flex-col sm:flex-row items-center sm:items-start gap-6 shadow-sm">
+<div class="w-20 h-20 rounded-full overflow-hidden shrink-0 border border-[#ded9cb] dark:border-[#2a3449]">
+<img alt="Md Radwan Ahamed, founder of Halcyo" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6w6FGp_hmLFd0nQqP35E7niC056cRMYync3Gr252jx1X5LFUu36_m6EBf_of7m4gTKPSSycLzDoSIgo4ZcN6JQb5WfcD_lzSrilU8deevfOy4FPpNEKvFkI00isN1X5uc7xcU7D_O_4t9Q_DmmNN_sPAyHEV7cUjDj-6_FGT9XF4ZRZLUzld2HNf1RuagELSMvGT0xOPqgmPna42KSbVsbTANWJ8pGWiWewAo7JkOzVJJpqf4_-8Vdw"/>
+</div>
+<div class="space-y-2 text-center sm:text-left">
+<h3 class="font-headline-sm text-base font-bold text-on-surface dark:text-[#ffffff]">A note from Md Radwan Ahamed, founder</h3>
+<p class="text-xs sm:text-sm text-on-surface-variant dark:text-[#b4bacd] leading-relaxed">
+              I am building Halcyo so small businesses in Bangladesh never lose a customer to a slow reply. We take all technical setup off your shoulders so you can sleep peacefully while your appointments fill up.
+            </p>
+<div class="pt-1">
+<a class="inline-flex items-center gap-1 text-xs font-bold text-primary dark:text-primary-fixed-dim hover:underline" href="https://linkedin.com" rel="noopener noreferrer" target="_blank">
+<span>Connect on LinkedIn</span>
+<span class="material-symbols-outlined text-[14px]">open_in_new</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Calm Direct CTA -->
+<section class="w-full py-20 text-center">
+<div class="max-w-2xl mx-auto px-6">
+<h2 class="font-headline-lg text-3xl sm:text-4xl font-bold text-on-surface dark:text-[#ffffff]">
+          Your next customer is messaging tonight.
+        </h2>
+<p class="font-body-lg text-sm sm:text-base text-on-surface-variant dark:text-[#a6acc2] mt-2 mb-6">
+          Book a 15-minute demo. We will show it answering your own business questions.
+        </p>
+<div class="flex flex-wrap items-center justify-center gap-3">
+<a class="bg-primary-container hover:bg-primary text-on-primary font-label-lg text-sm px-7 py-3.5 rounded-full shadow-sm transition-all" href="https://wa.me/8801966163995?text=Hi,%20I%20saw%20Halcyo%20and%20want%20a%20demo." rel="noopener noreferrer" target="_blank">
+            Book a demo on WhatsApp
+          </a>
+<a class="bg-white dark:bg-[#1a2333] border border-[#dedad0] dark:border-[#2b354c] text-on-surface dark:text-[#e4e7f6] font-label-lg text-sm px-6 py-3.5 rounded-full transition-all" href="#demo">
+            Try the test widget
+          </a>
+</div>
+</div>
+</section>
+</main>
+<!-- Atelier Footer -->
+<footer class="w-full bg-[#f4f2e8] dark:bg-[#0f141c] border-t border-[#e6e2d4] dark:border-[#1e2636] py-10 transition-colors duration-300">
+<div class="max-w-6xl mx-auto px-6 md:px-8 flex flex-col sm:flex-row items-center justify-between gap-6 text-xs text-on-surface-variant dark:text-[#8e96ac]">
+<div class="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
+<span class="font-headline-sm font-bold text-base text-on-surface dark:text-[#ffffff] lowercase">halcyo</span>
+<span>•</span>
+<span>Calm days for busy teams. Dhaka, Bangladesh.</span>
+<span>•</span>
+<span>Built on Claude by Anthropic.</span>
+</div>
+<div class="flex items-center gap-6 font-medium">
+<a class="hover:text-on-surface dark:hover:text-white transition-colors" href="#">Privacy</a>
+<a class="hover:text-on-surface dark:hover:text-white transition-colors" href="#">Terms</a>
+<a class="hover:text-on-surface dark:hover:text-white transition-colors" href="https://wa.me/8801966163995" rel="noopener noreferrer" target="_blank">WhatsApp</a>
+</div>
+</div>
+</footer>
+<script>
+    // Day / Night Calm Atelier Ambient Mode Toggle
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const themeToggleIcon = document.getElementById('theme-toggle-icon');
+    const themeToggleText = document.getElementById('theme-toggle-text');
+    const htmlEl = document.documentElement;
+
+    function setTheme(isDark) {
+      if (isDark) {
+        htmlEl.classList.add('dark');
+        htmlEl.classList.remove('light');
+        if (themeToggleIcon) themeToggleIcon.textContent = 'light_mode';
+        if (themeToggleText) themeToggleText.textContent = 'Day Mode';
+      } else {
+        htmlEl.classList.remove('dark');
+        htmlEl.classList.add('light');
+        if (themeToggleIcon) themeToggleIcon.textContent = 'bedtime';
+        if (themeToggleText) themeToggleText.textContent = '11 pm Mode';
+      }
+    }
+
+    if (themeToggleBtn) {
+      themeToggleBtn.addEventListener('click', () => {
+        const isDark = htmlEl.classList.contains('dark');
+        setTheme(!isDark);
+      });
+    }
+
+    // Tab Switching for Industries Section
+    const industryTabs = document.querySelectorAll('.industry-tab');
+    const industryPanels = {
+      abroad: document.getElementById('abroad-panel'),
+      pets: document.getElementById('pets-panel'),
+      clinics: document.getElementById('clinics-panel'),
+      law: document.getElementById('law-panel')
+    };
+
+    industryTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.getAttribute('data-industry');
+
+        industryTabs.forEach(t => {
+          t.classList.remove('bg-primary-container', 'text-on-primary', 'shadow-sm');
+          t.classList.add('bg-[#eeece1]', 'dark:bg-[#1f2839]', 'text-on-surface-variant', 'dark:text-[#a6acc2]');
+        });
+
+        tab.classList.remove('bg-[#eeece1]', 'dark:bg-[#1f2839]', 'text-on-surface-variant', 'dark:text-[#a6acc2]');
+        tab.classList.add('bg-primary-container', 'text-on-primary', 'shadow-sm');
+
+        Object.keys(industryPanels).forEach(key => {
+          if (industryPanels[key]) {
+            if (key === target) {
+              industryPanels[key].classList.remove('hidden');
+            } else {
+              industryPanels[key].classList.add('hidden');
+            }
+          }
+        });
+      });
+    });
+
+    // Interactive Demo Sandbox
+    function insertPrompt(text) {
+      const input = document.getElementById('interactive-input');
+      if (input) {
+        input.value = text;
+        input.focus();
+      }
+    }
+
+    const demoForm = document.getElementById('interactive-chat-form');
+    const chatLog = document.getElementById('interactive-chat-log');
+    const chatInput = document.getElementById('interactive-input');
+
+    if (demoForm && chatLog && chatInput) {
+      demoForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const val = chatInput.value.trim();
+        if (!val) return;
+
+        // User Message
+        const userDiv = document.createElement('div');
+        userDiv.className = 'flex justify-end';
+        userDiv.innerHTML = `<div class="bg-[#f0eee4] dark:bg-[#252f42] text-on-surface dark:text-[#eaecf6] px-4 py-2.5 rounded-2xl rounded-tr-none text-xs sm:text-sm leading-relaxed max-w-[85%] shadow-sm">${escapeHtml(val)}</div>`;
+        chatLog.appendChild(userDiv);
+        chatInput.value = '';
+        chatLog.scrollTop = chatLog.scrollHeight;
+
+        // Bot Response
+        setTimeout(() => {
+          let reply = "Amader Banani office e counsellor der shathe free session book korte paren. Kal ki slot faka dekhbo?";
+          const low = val.toLowerCase();
+          if (low.includes('fee') || low.includes('koto')) {
+            reply = "Student visa file opening sampurno free. University application fee institution er upor nirbhor kore (onk university te waiver ase).";
+          } else if (low.includes('address') || low.includes('kothay')) {
+            reply = "Amader main office Road 11, Banani, Dhaka te. Shonibar theke Brihoshpotibar shokal 10 ta theke shondha 6 ta porjonto open thake.";
+          } else if (low.includes('appointment') || low.includes('book')) {
+            reply = "Sure! Apnar phone number ar kon country te interested sheta janale ekhoni session confirm kore dicchi.";
+          }
+
+          const botDiv = document.createElement('div');
+          botDiv.className = 'flex justify-start';
+          botDiv.innerHTML = `<div class="bg-[#eef2ff] dark:bg-[#1d273f] text-[#0f1f4b] dark:text-[#d7e0ff] px-4 py-2.5 rounded-2xl rounded-tl-none text-xs sm:text-sm leading-relaxed max-w-[88%] shadow-sm">${escapeHtml(reply)}</div>`;
+          chatLog.appendChild(botDiv);
+          chatLog.scrollTop = chatLog.scrollHeight;
+        }, 400);
+      });
+    }
+
+    function escapeHtml(string) {
+      return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+        return ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+          '/': '&#x2F;',
+          '`': '&#x60;',
+          '=': '&#x3D;'
+        })[s];
+      });
+    }
+  </script>
+</body></html>
