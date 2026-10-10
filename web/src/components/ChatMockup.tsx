@@ -5,30 +5,30 @@ import { chats, type Chat } from "@/content/site";
 // Steps: 0 time, 1 customer, 2 typing, 3 reply, 4 chips, 5 pick, 6 booked.
 const WAITS = [200, 500, 900, 1300, 700, 1300, 900];
 
+// Every message is always laid out (hidden until its step), so the card keeps its final height.
 function Thread({ chat, step }: { chat: Chat; step: number }) {
+  const at = (s: number) => (step >= s ? "pop" : "invisible");
   return (
-    <div lang={chat.lang} className="flex min-h-[400px] flex-col gap-2 px-1 pt-4 pb-1 text-[15px] leading-normal">
-      {step >= 0 && <div className="pop self-center text-xs text-soft">11:42 pm</div>}
-      {step >= 1 && <div className="pop max-w-[84%] self-end rounded-2xl rounded-br-sm bg-brand px-3.5 py-2 text-on-brand">{chat.c1}</div>}
-      {step === 2 && (
-        <div className="flex gap-1 self-start rounded-2xl bg-wash px-3.5 py-3">
-          {[0, 1, 2].map((i) => <i key={i} className="blink size-1.5 rounded-full bg-soft" style={{ animationDelay: `${i * 0.15}s` }} />)}
-        </div>
-      )}
-      {step >= 3 && <div className="pop max-w-[84%] self-start rounded-2xl rounded-bl-sm bg-wash px-3.5 py-2">{chat.b1}</div>}
-      {step >= 4 && (
-        <div className="pop flex flex-wrap gap-1.5">
-          {chat.chips.map((c, i) => (
-            <span key={c} className={`rounded-full px-3 py-1 text-sm font-medium ring-1 ring-brand ring-inset ${step >= 5 && i === chat.pick ? "bg-brand text-on-brand" : "text-brand"}`}>{c}</span>
-          ))}
-        </div>
-      )}
-      {step >= 5 && <div className="pop max-w-[84%] self-end rounded-2xl rounded-br-sm bg-brand px-3.5 py-2 text-on-brand">{chat.chips[chat.pick]}</div>}
-      {step >= 6 && (
-        <div className="pop max-w-[84%] self-start rounded-2xl rounded-bl-sm bg-wash px-3.5 py-2">
-          {chat.done} <span className="ml-1 rounded-full bg-sun px-2 py-px text-xs font-semibold text-[#1a1b21]">Booked</span>
-        </div>
-      )}
+    <div lang={chat.lang} className="flex flex-col gap-2 px-1 pt-4 pb-1 text-[15px] leading-normal">
+      <div className={`${at(0)} self-center text-xs text-soft`}>11:42 pm</div>
+      <div className={`${at(1)} max-w-[84%] self-end rounded-2xl rounded-br-sm bg-brand px-3.5 py-2 text-on-brand`}>{chat.c1}</div>
+      <div className="grid max-w-[84%] self-start">
+        <div className={`${at(3)} [grid-area:1/1] rounded-2xl rounded-bl-sm bg-wash px-3.5 py-2`}>{chat.b1}</div>
+        {step === 2 && (
+          <div className="flex gap-1 self-start rounded-2xl bg-wash px-3.5 py-3 [grid-area:1/1]">
+            {[0, 1, 2].map((i) => <i key={i} className="blink size-1.5 rounded-full bg-soft" style={{ animationDelay: `${i * 0.15}s` }} />)}
+          </div>
+        )}
+      </div>
+      <div className={`${at(4)} flex flex-wrap gap-1.5`}>
+        {chat.chips.map((c, i) => (
+          <span key={c} className={`rounded-full px-3 py-1 text-sm font-medium ring-1 ring-brand ring-inset ${step >= 5 && i === chat.pick ? "bg-brand text-on-brand" : "text-brand"}`}>{c}</span>
+        ))}
+      </div>
+      <div className={`${at(5)} max-w-[84%] self-end rounded-2xl rounded-br-sm bg-brand px-3.5 py-2 text-on-brand`}>{chat.chips[chat.pick]}</div>
+      <div className={`${at(6)} max-w-[84%] self-start rounded-2xl rounded-bl-sm bg-wash px-3.5 py-2`}>
+        {chat.done} <span className="ml-1 rounded-full bg-sun px-2 py-px text-xs font-semibold text-[#1a1b21]">Booked</span>
+      </div>
     </div>
   );
 }

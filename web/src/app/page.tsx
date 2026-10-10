@@ -6,6 +6,7 @@ import { BOOK, HERO_IMAGE, faqs, plans, problems, steps, wa } from "@/content/si
 import { ChatMockup } from "@/components/ChatMockup";
 import { IndustryTabs } from "@/components/IndustryTabs";
 import { TryIt } from "@/components/TryIt";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const btn = "inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 font-semibold whitespace-nowrap transition active:translate-y-px";
 const primary = `${btn} bg-brand text-on-brand hover:brightness-95`;
@@ -45,7 +46,10 @@ export default function Home() {
             <a href="#pricing" className="hover:text-brand">Pricing</a>
             <a href="#faq" className="hover:text-brand">FAQ</a>
           </div>
-          <a href={BOOK} target="_blank" rel="noopener" className={`${primary} ml-auto min-h-10 px-5 text-sm`}>Book a demo</a>
+          <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
+            <a href={BOOK} target="_blank" rel="noopener" className={`${primary} min-h-10 px-5 text-sm`}>Book a demo</a>
+          </div>
         </nav>
       </header>
 

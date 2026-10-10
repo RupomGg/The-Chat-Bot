@@ -5,12 +5,12 @@
   --ink: #1a1b21; --soft: #4b4e5c; --bg: #fbfbf8; --surface: #ffffff;
   --sand: #f5f3eb; --wash: #eef2ff; --wash-sun: #fcedd7; --line: #e5e3d8;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --brand: #8eaaff; --on-brand: #0f141c;
-    --ink: #edeef6; --soft: #a6acc2; --bg: #0f141c; --surface: #161f2c;
-    --sand: #131a26; --wash: #1d273f; --wash-sun: #2d2217; --line: #242e42;
-  }
+/* Light by default; the nav switch adds .dark to <html> and remembers it. */
+:root.dark {
+  --brand: #8eaaff; --on-brand: #0f141c;
+  --ink: #edeef6; --soft: #a6acc2; --bg: #0f141c; --surface: #161f2c;
+  --sand: #131a26; --wash: #1d273f; --wash-sun: #2d2217; --line: #242e42;
+  color-scheme: dark;
 }
 
 @theme inline {

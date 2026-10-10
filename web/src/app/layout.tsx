@@ -14,7 +14,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${anek.variable} ${hind.variable} antialiased`}>
+    <html lang="en" className={`${anek.variable} ${hind.variable} antialiased`} suppressHydrationWarning>
+      <head>
+        {/* Applies a saved dark choice before paint, so there's no flash of light mode. */}
+        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("theme")==="dark")document.documentElement.classList.add("dark")}catch(e){}` }} />
+      </head>
       <body className="font-sans">{children}</body>
     </html>
   );
