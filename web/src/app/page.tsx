@@ -1,12 +1,13 @@
 import Image from "next/image";
 import {
-  ArrowRight, Check, Hourglass, MoonStars, Plus, Receipt, ShieldCheck, Translate, Tray, RocketLaunch, WhatsappLogo,
+  ArrowRight, ArrowUpRight, Check, Hourglass, MoonStars, Plus, Receipt, ShieldCheck, Translate, Tray, RocketLaunch, WhatsappLogo,
 } from "@phosphor-icons/react/ssr";
 import { BOOK, HERO_IMAGE, faqs, plans, problems, steps, wa } from "@/content/site";
 import { ChatMockup } from "@/components/ChatMockup";
 import { IndustryTabs } from "@/components/IndustryTabs";
 import { TryIt } from "@/components/TryIt";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import founder from "@/images/founder.webp";
 
 const btn = "inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 font-semibold whitespace-nowrap transition active:translate-y-px";
 const primary = `${btn} bg-brand text-on-brand hover:brightness-95`;
@@ -213,10 +214,14 @@ export default function Home() {
         {/* Founder */}
         <section className="pb-20">
           <div className={`${wrap} flex flex-col items-start gap-5 sm:flex-row sm:items-center`}>
-            <div aria-hidden className="grid size-16 shrink-0 place-items-center rounded-full bg-wash font-display text-2xl font-bold text-brand">R</div>
+            <Image src={founder} alt="Md Radwan Ahamed, founder of Halcyo" placeholder="blur" sizes="80px"
+              className="size-20 shrink-0 rounded-full object-cover ring-1 ring-line" />
             <div>
               <h3 className="font-display text-lg font-semibold">Md Radwan Ahamed, founder</h3>
               <p className="max-w-[62ch] text-soft">I&apos;m building Halcyo so small businesses in Bangladesh never lose a customer to a slow reply. Now onboarding our first pilot businesses.</p>
+              <a href="https://radwanahamed.dev" target="_blank" rel="noopener" className="mt-1 inline-flex items-center gap-1 font-semibold text-brand hover:underline">
+                radwanahamed.dev<ArrowUpRight size={16} aria-hidden />
+              </a>
             </div>
           </div>
         </section>
@@ -241,6 +246,10 @@ export default function Home() {
             <div className="font-display text-xl font-bold text-ink">halcyo</div>
             <div>Calm days for busy teams. Dhaka, Bangladesh.</div>
             <div>Built on Claude by Anthropic.</div>
+          </div>
+          <div>
+            <div>Questions: <a href="mailto:ask@halcyo.tech" className="text-ink hover:text-brand">ask@halcyo.tech</a></div>
+            <div>Business: <a href="mailto:contact@halcyo.tech" className="text-ink hover:text-brand">contact@halcyo.tech</a></div>
           </div>
           <nav aria-label="Footer" className="flex gap-5">
             <a href="/privacy" className="hover:text-brand">Privacy</a>
