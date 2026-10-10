@@ -7,11 +7,25 @@
 }
 /* Light by default; the nav switch adds .dark to <html> and remembers it. */
 :root.dark {
-  --brand: #8eaaff; --on-brand: #0f141c;
-  --ink: #edeef6; --soft: #a6acc2; --bg: #0f141c; --surface: #161f2c;
-  --sand: #131a26; --wash: #1d273f; --wash-sun: #2d2217; --line: #242e42;
+  --brand: #7cc7ae; --on-brand: #0f1d18; --sun: #e3a857;
+  --ink: #ededed; --soft: #a3a3a3; --bg: #121212; --surface: #1b1b1b;
+  --sand: rgb(255 255 255 / .02); --wash: #1d2824; --wash-sun: #2a2219; --line: rgb(255 255 255 / .08);
+  --glow-1: rgb(52 120 98 / .28); --glow-2: rgb(150 100 40 / .18);
+  --sheen: linear-gradient(180deg, rgb(255 255 255 / .05), rgb(255 255 255 / 0) 45%);
   color-scheme: dark;
 }
+:root {
+  --glow-1: rgb(36 83 214 / .07); --glow-2: rgb(246 164 60 / .08);
+  --sheen: linear-gradient(180deg, rgb(255 255 255 / .9), rgb(255 255 255 / 0) 55%), linear-gradient(135deg, rgb(36 83 214 / .03), rgb(246 164 60 / .03));
+}
+
+/* Soft corner glows on the page, gradient sheen on every container (both modes). */
+body {
+  background-image: radial-gradient(900px 700px at 0% 0%, var(--glow-1), transparent 70%),
+    radial-gradient(900px 800px at 100% 60%, var(--glow-2), transparent 70%);
+  background-attachment: fixed;
+}
+.bg-surface, .bg-wash, .bg-wash-sun { background-image: var(--sheen); }
 
 @theme inline {
   --color-brand: var(--brand);
