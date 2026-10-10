@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import {
   ArrowRight, ArrowUpRight, Check, Hourglass, MoonStars, Plus, Receipt, ShieldCheck, Translate, Tray, RocketLaunch, WhatsappLogo,
 } from "@phosphor-icons/react/ssr";
@@ -245,15 +246,15 @@ export default function Home() {
           <div>
             <div className="font-display text-xl font-bold text-ink">halcyo</div>
             <div>Calm days for busy teams. Dhaka, Bangladesh.</div>
-            <div>Built on Claude by Anthropic.</div>
           </div>
           <div>
             <div>Questions: <a href="mailto:ask@halcyo.tech" className="text-ink hover:text-brand">ask@halcyo.tech</a></div>
             <div>Business: <a href="mailto:contact@halcyo.tech" className="text-ink hover:text-brand">contact@halcyo.tech</a></div>
           </div>
           <nav aria-label="Footer" className="flex gap-5">
-            <a href="/privacy" className="hover:text-brand">Privacy</a>
-            <a href="/terms" className="hover:text-brand">Terms</a>
+            <Link href="/privacy" className="hover:text-brand">Privacy</Link>
+            <Link href="/terms" className="hover:text-brand">Terms</Link>
+            <Link href="/data-processing" className="hover:text-brand">Data processing</Link>
             <a href={BOOK} target="_blank" rel="noopener" className="hover:text-brand">WhatsApp</a>
           </nav>
         </div>
